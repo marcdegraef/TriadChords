@@ -1,0 +1,12 @@
+ &TriadProgression
+! semitone increments for triad chord 1
+ triad1 = 0 4 7,
+! chord 2
+ triad2 = 0 3 7, 
+! chord 3
+ triad3 = 0 3 7,
+! number of intervals into which to split two octaves
+ numint = 200,
+! output file name
+ outname = 'undefined',
+ /

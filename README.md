@@ -1,2 +1,4 @@
 # TriadChords
-Basic library to compute dissonance and tension for triad chords
+Basic Fortran 2018 library to compute dissonance and tension for triad chords
+
+
