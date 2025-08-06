@@ -26,51 +26,28 @@
 ! USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ! ###################################################################
 
-program TriadProgression
+program Triad
   !! author: MDG
   !! version: 1.0 
-  !! date: 08/04/25
+  !! date: 08/05/25
   !!
-  !! Program to compute dissonance and tension plot for progression of 3 triad chords
+  !! Simple program to compute dissonance, tension, and modality for a single triad chord
 
 use mod_kinds
 use mod_global
 use mod_io
-use mod_TriadProgression
+use mod_triads
 
 IMPLICIT NONE
 
-character(fnlen)                :: progname = 'TriadProgression.f90'
-character(fnlen)                :: progdesc = 'Program to compute dissonance and tension plot for progression of 3 triad chords'
+character(fnlen)                :: progname = 'Triad.f90'
+character(fnlen)                :: progdesc = 'Simple program to compute dissonance, tension, and modality for a single triad chord'
 
 type(IO_T)                      :: Message
-type(TriadProgression_T)        :: TP
-
-integer(kind=irg)               :: numarg       ! number of command line arguments
-integer(kind=irg)               :: iargc        ! external function for command line
-integer(kind=irg)               :: io_int(1)
-character(fnlen)                :: arg          ! to be read from the command line
-character(fnlen)                :: cptl
-
-! handle any command line argument (only -t is recognized)
-numarg = command_argument_count()
-if (numarg.gt.0) then
-  if (numarg.gt.1) numarg = 1  ! only -t is possible
-  io_int(1) = numarg
-  call Message%WriteValue(' Number of command line arguments detected: ',io_int,1)
-  call get_command_argument(1,arg)
-  if (trim(arg).eq.'-t') then
-    cptl = 'TriadProgression.template'
-    TP = TriadProgression_T( copy_tpl = cptl )
-  else
-    TP = TriadProgression_T( nmlfile = arg )
-  end if
-else
- cptl = 'TriadProgression.nml'
- TP = TriadProgression_T( nmlfile = cptl )
-end if 
+type(Triad_T)                   :: TP
 
 ! perform the computations
-call TP%TriadProgression( progname, progdesc )
+TP = Triad_T()
+call TP%triad( progname, progdesc )
 
-end program TriadProgression
+end program Triad

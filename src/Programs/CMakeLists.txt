@@ -14,3 +14,11 @@ set(LIB_SEARCH_DIRS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} ${CMAKE_RUNTIME_OUTPUT_DIR
                              INSTALL_PROGRAM TRUE
                              INCLUDE_DIRS ${TriadChordsLib_BINARY_DIR}
                              )
+
+  Add_TriadChords_Executable(TARGET Triad
+                             SOURCES ${APP_DIR}/Triad.f90
+                             LINK_LIBRARIES ${EXE_LINK_LIBRARIES}
+                             SOLUTION_FOLDER src/Programs
+                             INSTALL_PROGRAM TRUE
+                             INCLUDE_DIRS ${TriadChordsLib_BINARY_DIR}
+                             )

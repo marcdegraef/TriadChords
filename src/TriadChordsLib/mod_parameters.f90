@@ -40,7 +40,8 @@ type fit_parameters
   real(kind=dbl)            :: b2 = 1.6D0                        ! used for dissonance computation
   real(kind=dbl)            :: b3 = 4.0D0                        ! used for dissonance computation
   real(kind=dbl)            :: gam = 1.25D0                      ! used for dissonance computation
-  real(kind=dbl)            :: eps = 1.283697D0                  ! used for modality computation
+  real(kind=dbl)            :: eps = 1.28402543D0                ! used for modality computation
+  real(kind=dbl)            :: delta = 0.207D0                   ! weight factor for instability
   real(kind=dbl)            :: freq2int = 39.8631D0              ! conversion parameter from frequency to interval
 end type fit_parameters
 
@@ -49,5 +50,18 @@ type timbre_descriptor
   integer(kind=irg)         :: timbre_type                       ! 1 for base^n; 2 for 1/n; ...
   integer(kind=irg)         :: num_partials                      ! number of upper partials to include
 end type timbre_descriptor
+
+type scale
+  character(2)              :: notes(12) = (/ ' C','C#',' D','D#',' E',' F','F#',' G','G#',' A','A#',' B' /)
+end type scale 
+
+! basic triad chords and their inversions in interval form
+type triad_chords
+  real(kind=dbl)            :: major(9) =       dble( (/ 0, 4, 7,  4, 7, 12,  7, 12, 16 /) )
+  real(kind=dbl)            :: minor(9) =       dble( (/ 0, 3, 7,  3, 7, 12,  7, 12, 15 /) )
+  real(kind=dbl)            :: augmented(9) =   dble( (/ 0, 4, 8,  4, 8, 12,  8, 12, 16 /) )
+  real(kind=dbl)            :: diminished(9) =  dble( (/ 0, 3, 6,  3, 6, 12,  6, 12, 15 /) )
+  real(kind=dbl)            :: suspended(9) =   dble( (/ 0, 5, 7,  5, 7, 12,  7, 12, 17 /) )
+end type triad_chords
 
 end module mod_parameters

@@ -11,6 +11,11 @@ set(TriadLib_SRCS
   ${TriadLib_SOURCE_DIR}/mod_parameters.f90
   ${TriadLib_SOURCE_DIR}/mod_io.f90
   ${TriadLib_SOURCE_DIR}/mod_triads.f90
+  ${TriadLib_SOURCE_DIR}/mod_bmp.f90
+  ${TriadLib_SOURCE_DIR}/mod_tif.f90
+  ${TriadLib_SOURCE_DIR}/mod_lzw.f90
+  ${TriadLib_SOURCE_DIR}/mod_image.f90
+  ${TriadLib_SOURCE_DIR}/mod_image_io.f90
 
 
   ${TriadLib_SOURCE_DIR}/program_mods/mod_TriadProgression.f90

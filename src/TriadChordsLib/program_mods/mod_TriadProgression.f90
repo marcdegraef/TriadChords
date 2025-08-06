@@ -111,7 +111,7 @@ if (present(copy_tpl)) then ! copy the namelist template
    call Message%printMessage('  -> created template file '//trim(outname), frm = "(A)" )
    STOP '  -> please rename and edit the name list file'
 else
-  call TriadProgression%readNameList(nmlfile)
+  call TriadProgression%readNameList_(nmlfile)
 end if
 
 end function TriadProgression_constructor
@@ -225,8 +225,8 @@ type(IO_T)                                      :: Message
 
 integer(kind=sgl)                               :: i,j,k,l,iv11,iv12,iv21,iv22,iv31,iv32,dims,istat 
 real(kind=dbl)                                  :: set1(3), set2(3), set3(3), fr2(3), fr3(3), tt12
-real(kind=dbl)                                  :: tt13, tt23, dd12, dd13, dd23, r
-real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:)
+real(kind=dbl)                                  :: tt13, tt23, dd12, dd13, dd23, mm12, mm13, mm23, r
+real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:), mm(:,:)
 character(len=7)                                :: id
 
 
@@ -240,7 +240,7 @@ TT = Triad_T()
 
 ! define the simulation parameters and allocate arrays
 dims = self%nml%numint
-allocate(xx(dims),dd(dims,dims),ttt(dims,dims),stat=istat)
+allocate(xx(dims),dd(dims,dims),ttt(dims,dims),mm(dims,dims),stat=istat)
 do i=1,dims
         xx(i) = 24.D0*dble(i)/dble(dims) - 12.D0
 end do
@@ -252,91 +252,91 @@ set3 = dble(self%nml%triad3)
 ! start major computation loop
 do i=1,dims
         fr2 = xx(i) + set2
-        tt12 =        TT%interval_totaltension(set1(1),fr2(1),fr2(2))
-        tt12 = tt12 + TT%interval_totaltension(set1(1),fr2(1),fr2(3))
-        tt12 = tt12 + TT%interval_totaltension(set1(1),fr2(2),fr2(3))
-        tt12 = tt12 + TT%interval_totaltension(set1(2),fr2(1),fr2(2))
-        tt12 = tt12 + TT%interval_totaltension(set1(2),fr2(1),fr2(3))
-        tt12 = tt12 + TT%interval_totaltension(set1(2),fr2(2),fr2(3))
-        tt12 = tt12 + TT%interval_totaltension(set1(3),fr2(1),fr2(2))
-        tt12 = tt12 + TT%interval_totaltension(set1(3),fr2(1),fr2(3))
-        tt12 = tt12 + TT%interval_totaltension(set1(3),fr2(2),fr2(3))
+        tt12 =        TT%triad_tension(set1(1),fr2(1),fr2(2))
+        tt12 = tt12 + TT%triad_tension(set1(1),fr2(1),fr2(3))
+        tt12 = tt12 + TT%triad_tension(set1(1),fr2(2),fr2(3))
+        tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(2))
+        tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(3))
+        tt12 = tt12 + TT%triad_tension(set1(2),fr2(2),fr2(3))
+        tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(2))
+        tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(3))
+        tt12 = tt12 + TT%triad_tension(set1(3),fr2(2),fr2(3))
         
-        tt12 = tt12 + TT%interval_totaltension(fr2(1),set1(1),set1(2))
-        tt12 = tt12 + TT%interval_totaltension(fr2(1),set1(1),set1(3))
-        tt12 = tt12 + TT%interval_totaltension(fr2(1),set1(2),set1(3))
-        tt12 = tt12 + TT%interval_totaltension(fr2(2),set1(1),set1(2))
-        tt12 = tt12 + TT%interval_totaltension(fr2(2),set1(1),set1(3))
-        tt12 = tt12 + TT%interval_totaltension(fr2(2),set1(2),set1(3))
-        tt12 = tt12 + TT%interval_totaltension(fr2(3),set1(1),set1(2))
-        tt12 = tt12 + TT%interval_totaltension(fr2(3),set1(1),set1(3))
-        tt12 = tt12 + TT%interval_totaltension(fr2(3),set1(2),set1(3))
+        tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(2))
+        tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(3))
+        tt12 = tt12 + TT%triad_tension(fr2(1),set1(2),set1(3))
+        tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(2))
+        tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(3))
+        tt12 = tt12 + TT%triad_tension(fr2(2),set1(2),set1(3))
+        tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(2))
+        tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(3))
+        tt12 = tt12 + TT%triad_tension(fr2(3),set1(2),set1(3))
         tt12 = tt12/18.D0
 
         dd12 = 0.D0
         do k=1,3
                 do l=1,3
-                        dd12 = dd12 + TT%interval_totaldissonance(dabs(set1(k)-fr2(l)))
+                        dd12 = dd12 + TT%triad_dissonance(dabs(set1(k)-fr2(l)))
                 end do
         end do
         dd12 = dd12/9.D0
 
         do j=1,dims
                 fr3 = xx(j) + set3
-                tt23 =        TT%interval_totaltension(fr2(1),fr3(1),fr3(2))
-                tt23 = tt23 + TT%interval_totaltension(fr2(1),fr3(1),fr3(3))
-                tt23 = tt23 + TT%interval_totaltension(fr2(1),fr3(2),fr3(3))
-                tt23 = tt23 + TT%interval_totaltension(fr2(2),fr3(1),fr3(2))
-                tt23 = tt23 + TT%interval_totaltension(fr2(2),fr3(1),fr3(3))
-                tt23 = tt23 + TT%interval_totaltension(fr2(2),fr3(2),fr3(3))
-                tt23 = tt23 + TT%interval_totaltension(fr2(3),fr3(1),fr3(2))
-                tt23 = tt23 + TT%interval_totaltension(fr2(3),fr3(1),fr3(3))
-                tt23 = tt23 + TT%interval_totaltension(fr2(3),fr3(2),fr3(3))
+                tt23 =        TT%triad_tension(fr2(1),fr3(1),fr3(2))
+                tt23 = tt23 + TT%triad_tension(fr2(1),fr3(1),fr3(3))
+                tt23 = tt23 + TT%triad_tension(fr2(1),fr3(2),fr3(3))
+                tt23 = tt23 + TT%triad_tension(fr2(2),fr3(1),fr3(2))
+                tt23 = tt23 + TT%triad_tension(fr2(2),fr3(1),fr3(3))
+                tt23 = tt23 + TT%triad_tension(fr2(2),fr3(2),fr3(3))
+                tt23 = tt23 + TT%triad_tension(fr2(3),fr3(1),fr3(2))
+                tt23 = tt23 + TT%triad_tension(fr2(3),fr3(1),fr3(3))
+                tt23 = tt23 + TT%triad_tension(fr2(3),fr3(2),fr3(3))
                 
-                tt23 = tt23 + TT%interval_totaltension(fr3(1),fr2(1),fr2(2))
-                tt23 = tt23 + TT%interval_totaltension(fr3(1),fr2(1),fr2(3))
-                tt23 = tt23 + TT%interval_totaltension(fr3(1),fr2(2),fr2(3))
-                tt23 = tt23 + TT%interval_totaltension(fr3(2),fr2(1),fr2(2))
-                tt23 = tt23 + TT%interval_totaltension(fr3(2),fr2(1),fr2(3))
-                tt23 = tt23 + TT%interval_totaltension(fr3(2),fr2(2),fr2(3))
-                tt23 = tt23 + TT%interval_totaltension(fr3(3),fr2(1),fr2(2))
-                tt23 = tt23 + TT%interval_totaltension(fr3(3),fr2(1),fr2(3))
-                tt23 = tt23 + TT%interval_totaltension(fr3(3),fr2(2),fr2(3))
+                tt23 = tt23 + TT%triad_tension(fr3(1),fr2(1),fr2(2))
+                tt23 = tt23 + TT%triad_tension(fr3(1),fr2(1),fr2(3))
+                tt23 = tt23 + TT%triad_tension(fr3(1),fr2(2),fr2(3))
+                tt23 = tt23 + TT%triad_tension(fr3(2),fr2(1),fr2(2))
+                tt23 = tt23 + TT%triad_tension(fr3(2),fr2(1),fr2(3))
+                tt23 = tt23 + TT%triad_tension(fr3(2),fr2(2),fr2(3))
+                tt23 = tt23 + TT%triad_tension(fr3(3),fr2(1),fr2(2))
+                tt23 = tt23 + TT%triad_tension(fr3(3),fr2(1),fr2(3))
+                tt23 = tt23 + TT%triad_tension(fr3(3),fr2(2),fr2(3))
                 tt23 = tt23/18.D0
 
                 dd23 = 0.D0
                 do k=1,3
                         do l=1,3
-                                dd23 = dd23 + TT%interval_totaldissonance(dabs(fr2(k)-fr3(l)))
+                                dd23 = dd23 + TT%triad_dissonance(dabs(fr2(k)-fr3(l)))
                         end do
                 end do
                 dd23 = dd23/9.D0
 
-                tt13 =        TT%interval_totaltension(fr3(1),set1(1),set1(2))
-                tt13 = tt13 + TT%interval_totaltension(fr3(1),set1(1),set1(3))
-                tt13 = tt13 + TT%interval_totaltension(fr3(1),set1(2),set1(3))
-                tt13 = tt13 + TT%interval_totaltension(fr3(2),set1(1),set1(2))
-                tt13 = tt13 + TT%interval_totaltension(fr3(2),set1(1),set1(3))
-                tt13 = tt13 + TT%interval_totaltension(fr3(2),set1(2),set1(3))
-                tt13 = tt13 + TT%interval_totaltension(fr3(3),set1(1),set1(2))
-                tt13 = tt13 + TT%interval_totaltension(fr3(3),set1(1),set1(3))
-                tt13 = tt13 + TT%interval_totaltension(fr3(3),set1(2),set1(3))
+                tt13 =        TT%triad_tension(fr3(1),set1(1),set1(2))
+                tt13 = tt13 + TT%triad_tension(fr3(1),set1(1),set1(3))
+                tt13 = tt13 + TT%triad_tension(fr3(1),set1(2),set1(3))
+                tt13 = tt13 + TT%triad_tension(fr3(2),set1(1),set1(2))
+                tt13 = tt13 + TT%triad_tension(fr3(2),set1(1),set1(3))
+                tt13 = tt13 + TT%triad_tension(fr3(2),set1(2),set1(3))
+                tt13 = tt13 + TT%triad_tension(fr3(3),set1(1),set1(2))
+                tt13 = tt13 + TT%triad_tension(fr3(3),set1(1),set1(3))
+                tt13 = tt13 + TT%triad_tension(fr3(3),set1(2),set1(3))
                 
-                tt13 = tt13 + TT%interval_totaltension(set1(1),fr3(1),fr3(2))
-                tt13 = tt13 + TT%interval_totaltension(set1(1),fr3(1),fr3(3))
-                tt13 = tt13 + TT%interval_totaltension(set1(1),fr3(2),fr3(3))
-                tt13 = tt13 + TT%interval_totaltension(set1(2),fr3(1),fr3(2))
-                tt13 = tt13 + TT%interval_totaltension(set1(2),fr3(1),fr3(3))
-                tt13 = tt13 + TT%interval_totaltension(set1(2),fr3(2),fr3(3))
-                tt13 = tt13 + TT%interval_totaltension(set1(3),fr3(1),fr3(2))
-                tt13 = tt13 + TT%interval_totaltension(set1(3),fr3(1),fr3(3))
-                tt13 = tt13 + TT%interval_totaltension(set1(3),fr3(2),fr3(3))
+                tt13 = tt13 + TT%triad_tension(set1(1),fr3(1),fr3(2))
+                tt13 = tt13 + TT%triad_tension(set1(1),fr3(1),fr3(3))
+                tt13 = tt13 + TT%triad_tension(set1(1),fr3(2),fr3(3))
+                tt13 = tt13 + TT%triad_tension(set1(2),fr3(1),fr3(2))
+                tt13 = tt13 + TT%triad_tension(set1(2),fr3(1),fr3(3))
+                tt13 = tt13 + TT%triad_tension(set1(2),fr3(2),fr3(3))
+                tt13 = tt13 + TT%triad_tension(set1(3),fr3(1),fr3(2))
+                tt13 = tt13 + TT%triad_tension(set1(3),fr3(1),fr3(3))
+                tt13 = tt13 + TT%triad_tension(set1(3),fr3(2),fr3(3))
                 tt13 = tt13/18.D0
         
                 dd13 = 0.D0
                 do k=1,3
                         do l=1,3
-                                dd13 = dd13 + TT%interval_totaldissonance(dabs(fr3(k)-set1(l)))
+                                dd13 = dd13 + TT%triad_dissonance(dabs(fr3(k)-set1(l)))
                         end do
                 end do
                 dd13 = dd13/9.D0
@@ -348,8 +348,8 @@ end do
 
 ! and save the resulting arrays in a file that can be read by IDL
 open(unit=dataunit,file=trim(self%nml%outname),status='unknown',action='write',form='unformatted')
-write (dataunit) dd
-write (dataunit) ttt
+write (dataunit) real(dd)
+write (dataunit) real(ttt)
 close(unit=dataunit,status='keep')
 
 end subroutine TriadProgression_

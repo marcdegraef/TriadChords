@@ -40,6 +40,7 @@ type, public :: Triad_T
     character(fnlen)            :: sourcepath
     type(fit_parameters)        :: fits    
     type(timbre_descriptor)     :: timbre_parameters
+    type(triad_chords)          :: TC
 
 ! then a few allocatable arrays
     real(kind=dbl),allocatable  :: timbre(:)        ! timbre amplitudes
@@ -51,8 +52,11 @@ type, public :: Triad_T
 contains
   private
 
-    procedure, pass(self) :: interval_totaldissonance_
-    procedure, pass(self) :: interval_totaltension_
+    procedure, pass(self) :: triad_
+    procedure, pass(self) :: triadplots_
+    procedure, pass(self) :: triad_dissonance_
+    procedure, pass(self) :: triad_tension_
+    procedure, pass(self) :: triad_modality_
     procedure, pass(self) :: setbase_
     procedure, pass(self) :: getbase_
     procedure, pass(self) :: settimbre_type_
@@ -62,8 +66,11 @@ contains
     procedure, pass(self) :: setsourcepath_
     procedure, pass(self) :: getsourcepath_
 
-    generic, public :: interval_totaldissonance => interval_totaldissonance_
-    generic, public :: interval_totaltension => interval_totaltension_
+    generic, public :: triad => triad_
+    generic, public :: triadplots => triadplots_
+    generic, public :: triad_dissonance => triad_dissonance_
+    generic, public :: triad_tension => triad_tension_
+    generic, public :: triad_modality => triad_modality_
     generic, public :: setbase => setbase_
     generic, public :: getbase => getbase_
     generic, public :: settimbre_type => settimbre_type_
@@ -179,6 +186,9 @@ if (alloc.eqv..TRUE.) then
     end do
   endif
 
+  ! we'll set the total energy equal to 1
+  ! Triad%timbre = Triad%timbre / sqrt(sum(Triad%timbre**2))
+
   ! allocate an array for the partial intervals
   if (.not.allocated(Triad%partials)) then 
     allocate(Triad%partials(0:Tt%num_partials),stat=istat)
@@ -190,7 +200,8 @@ if (alloc.eqv..TRUE.) then
   ! and fill the array
   Triad%partials(0) = 0.D0
   do i=1,Tt%num_partials
-    Triad%partials(i) = Triad%fits%freq2int * dlog10(dble(i+1)/dble(i)) + Triad%partials(i-1)
+    ! Triad%partials(i) = Triad%fits%freq2int * dlog10(dble(i+1)/dble(i)) + Triad%partials(i-1)
+    Triad%partials(i) = Triad%fits%freq2int * dlog10(dble(i+1)) 
   end do
 
   ! allocate an array for the precomputed products of timbre amplitudes
@@ -376,8 +387,8 @@ out = self%sourcepath
 end function getsourcepath_
 
 !--------------------------------------------------------------------------
-recursive function interval_totaldissonance_(self, x) result(itd)
-!DEC$ ATTRIBUTES DLLEXPORT :: interval_totaldissonance_
+recursive function triad_dissonance_(self, x) result(itd)
+!DEC$ ATTRIBUTES DLLEXPORT :: triad_dissonance_
   !! author: MDG
   !! date: 10/22/08
   !!
@@ -391,24 +402,26 @@ class(Triad_T),INTENT(INOUT)          :: self
 real(kind=dbl),INTENT(IN)             :: x                ! the input interval (in units of semitones)
 real(kind=dbl)                        :: itd 
 
-real(kind=dbl)                        :: d                ! axiliary variable
+real(kind=dbl)                        :: d, np            ! axiliary variable
 integer(kind=irg)                     :: i,j,i1,istat     ! loop counters, etc...
 
 i1 =1 
+np = dble(self%timbre_parameters%num_partials+1)
 do i=0,self%timbre_parameters%num_partials
   do j=0,self%timbre_parameters%num_partials
     self%q2(i1) = dabs(self%partials(i) - (x+self%partials(j)))**self%fits%gam
     i1 = i1+1
   end do
 end do
-d = sum(self%prods2 * (dexp(-self%fits%b1*self%q2)-dexp(-self%fits%b2*self%q2)))
-itd = self%fits%b3 * d
 
-end function interval_totaldissonance_
+d = sum(self%prods2 * (dexp(-self%fits%b1*self%q2)-dexp(-self%fits%b2*self%q2)))
+itd = self%fits%b3 * d / np
+
+end function triad_dissonance_
 
 !--------------------------------------------------------------------------
-recursive function interval_totaltension_(self,i1,i2,i3) result(itt)
-!DEC$ ATTRIBUTES DLLEXPORT :: interval_totaldissonance_
+recursive function triad_tension_(self,i1,i2,i3) result(itt)
+!DEC$ ATTRIBUTES DLLEXPORT :: triad_tension_
   !! author: MDG
   !! date: 10/22/08
   !!
@@ -424,13 +437,13 @@ real(kind=dbl),INTENT(IN)         :: i1,i2,i3              ! three input notes (
 real(kind=dbl)                    :: itt 
 
 real(kind=dbl)                    :: x,y,tmp               ! intervals
-real(kind=dbl)                    :: p1,p2,p3(3)           ! axuiliary variables
+real(kind=dbl)                    :: p1,p2,p3(3)           ! auxiliary variables
 integer(kind=irg)                 :: i,j,k,ii,jj,istat,s1,s2,s3  ! loop counters etc
-integer(kind=irg)                 :: iswap1,iswap(1)
+integer(kind=irg)                 :: iswap1,iswap(1), np
 
 x = i2-i1
 y = i3-i1
-
+np = dble(self%timbre_parameters%num_partials+1)
 jj =1 
 do i=0,self%timbre_parameters%num_partials
   p1 = self%partials(i)
@@ -453,8 +466,266 @@ do i=0,self%timbre_parameters%num_partials
     end do
   end do
 end do
-itt = sum(self%prods * dexp(-self%q3))
+itt = sum(self%prods * dexp(-self%q3)) ! / np
 
-end function interval_totaltension_
+end function triad_tension_
+
+!--------------------------------------------------------------------------
+recursive function triad_modality_(self,i1,i2,i3) result(itm)
+!DEC$ ATTRIBUTES DLLEXPORT :: triad_modality_
+  !! author: MDG
+  !! date: 08/05/25
+  !!
+  !! computes the total modality
+  !!
+  !! equation 6 in Cook&Fujisawa (2006)
+
+IMPLICIT NONE
+
+class(Triad_T),INTENT(INOUT)      :: self 
+real(kind=dbl),INTENT(IN)         :: i1,i2,i3    ! three input notes (in units of semi-tones)
+real(kind=dbl)                    :: itm 
+
+real(kind=dbl)                    :: x,y,tmp               ! intervals
+real(kind=dbl)                    :: p1,p2,p3(3)           ! auxiliary variables
+integer(kind=irg)                 :: i,j,k,ii,jj,istat,s1,s2,s3  ! loop counters etc
+integer(kind=irg)                 :: iswap1,iswap(1), np
+
+
+x = i2-i1
+y = i3-i1
+np = dble(self%timbre_parameters%num_partials+1)
+
+jj =1 
+do i=0,self%timbre_parameters%num_partials
+  p1 = self%partials(i)
+  do j=0,self%timbre_parameters%num_partials
+    p2 = x + self%partials(j)
+    do k=0,self%timbre_parameters%num_partials
+      p3 = (/p1,p2,y + self%partials(k)/)
+! sort p3 from large to small using a simple selection sort
+      do ii=1,2
+        iswap = maxloc(p3(ii:3))
+        iswap1 = iswap(1)+ii-1
+        if (iswap1.ne.ii) then 
+                tmp = p3(ii)
+                p3(ii) = p3(iswap1)
+                p3(iswap1) = tmp
+        endif
+      end do
+      self%q2(jj) = self%fits%eps* (p3(1)-2.D0*p3(2)+p3(3))
+      self%q3(jj) = 0.25D0 * (p3(1)-2.D0*p3(2)+p3(3))**4
+      if (self%q3(jj).gt.100.D0) then 
+        self%q3(jj) = 0.D0
+      else 
+        self%q3(jj) = dexp(-self%q3(jj))
+      end if 
+      jj = jj+1
+    end do
+  end do
+end do
+itm = - sum(self%prods * self%q2 * self%q3) ! / np
+
+end function triad_modality_
+
+
+!--------------------------------------------------------------------------
+recursive subroutine triad_(self, progname, progdesc)
+!DEC$ ATTRIBUTES DLLEXPORT :: triad_
+  !! author: MDG
+  !! date: 08/05/25
+  !!
+  !! computes the dissonance, tension, and modality for the basic
+  !! triad chords and their inversions
+  !!
+
+use mod_io 
+
+IMPLICIT NONE
+
+class(Triad_T),INTENT(INOUT)      :: self 
+character(fnlen),INTENT(IN)       :: progname
+character(fnlen),INTENT(IN)       :: progdesc
+
+type(IO_T)                        :: Message 
+
+real(kind=dbl)                    :: io_real(self%timbre_parameters%num_partials+1)
+integer(kind=irg)                 :: io_int(1), i
+
+real(kind=dbl)                    :: tension(3), dissonance(3), modality(3), instability(3) 
+
+
+call Message%printMessage(' ')
+call Message%printMessage(' Program Name       : '//trim(progname))
+call Message%printMessage(' Program Descriptor : '//trim(progdesc))
+call Message%printMessage(' ')
+
+io_int(1) = self%timbre_parameters%num_partials
+call Message%WriteValue(' Number of partials   : ', io_int, 1, frm="(I3)")
+if (self%timbre_parameters%timbre_type.eq.1) then 
+  io_real(1) = self%timbre_parameters%base
+  call Message%WriteValue(' Timbre type base^n with base = ', io_real, 1, frm="(F6.3)")
+else
+  call Message%printMessage(' Timbre type 1/n') 
+end if 
+io_real = self%timbre(0:self%timbre_parameters%num_partials)
+call Message%WriteValue(' Timbre values = ', io_real, self%timbre_parameters%num_partials+1, frm="(20(F6.3,' '))")
+io_real = self%partials(0:self%timbre_parameters%num_partials)
+call Message%WriteValue(' Partial values = ', io_real, self%timbre_parameters%num_partials+1, frm="(20(F6.3,' '))")
+call Message%printMessage(' ')
+
+call Message%printMessage( (/ ' Major Chords ', & 
+                              ' ------------ ', &
+                              '              ' /) )
+
+do i=0,2
+  dissonance(i+1) = self%triad_dissonance(self%TC%major(2+3*i)-self%TC%major(1+3*i)) + &
+                    self%triad_dissonance(self%TC%major(3+3*i)-self%TC%major(1+3*i)) + &
+                    self%triad_dissonance(self%TC%major(3+3*i)-self%TC%major(2+3*i))
+  tension(i+1) = self%triad_tension(self%TC%major(1+3*i),self%TC%major(2+3*i),self%TC%major(3+3*i))
+  modality(i+1) = self%triad_modality(self%TC%major(1+3*i),self%TC%major(2+3*i),self%TC%major(3+3*i))
+end do
+instability = dissonance + self%fits%delta * tension 
+
+io_real(1:3) = dissonance
+call Message%printMessage('                R        1        2')
+call Message%WriteValue(' Dissonance  : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = tension
+call Message%WriteValue(' Tension     : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = instability
+call Message%WriteValue(' Instability : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = modality
+call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
+
+
+call Message%printMessage(' ')
+call Message%printMessage( (/ ' Minor Chords ', & 
+                              ' ------------ ', &
+                              '              ' /) )
+
+do i=0,2
+  dissonance(i+1) = self%triad_dissonance(self%TC%minor(2+3*i)-self%TC%minor(1+3*i)) + &
+                    self%triad_dissonance(self%TC%minor(3+3*i)-self%TC%minor(1+3*i)) + &
+                    self%triad_dissonance(self%TC%minor(3+3*i)-self%TC%minor(2+3*i))
+  tension(i+1) = self%triad_tension(self%TC%minor(1+3*i),self%TC%minor(2+3*i),self%TC%minor(3+3*i))
+  modality(i+1) = self%triad_modality(self%TC%minor(1+3*i),self%TC%minor(2+3*i),self%TC%minor(3+3*i))
+end do
+instability = dissonance + self%fits%delta * tension 
+
+io_real(1:3) = dissonance
+call Message%printMessage('                R        1        2')
+call Message%WriteValue(' Dissonance  : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = tension
+call Message%WriteValue(' Tension     : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = instability
+call Message%WriteValue(' Instability : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = modality
+call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
+
+
+
+call Message%printMessage(' ')
+call Message%printMessage( (/ ' Augmented Chords ', & 
+                              ' ---------------- ', &
+                              '                  ' /) )
+
+do i=0,2
+  dissonance(i+1) = self%triad_dissonance(self%TC%augmented(2+3*i)-self%TC%augmented(1+3*i)) + &
+                    self%triad_dissonance(self%TC%augmented(3+3*i)-self%TC%augmented(1+3*i)) + &
+                    self%triad_dissonance(self%TC%augmented(3+3*i)-self%TC%augmented(2+3*i))
+  tension(i+1) = self%triad_tension(self%TC%augmented(1+3*i),self%TC%augmented(2+3*i),self%TC%augmented(3+3*i))
+  modality(i+1) = self%triad_modality(self%TC%augmented(1+3*i),self%TC%augmented(2+3*i),self%TC%augmented(3+3*i))
+end do
+instability = dissonance + self%fits%delta * tension 
+
+io_real(1:3) = dissonance
+call Message%printMessage('                R        1        2')
+call Message%WriteValue(' Dissonance  : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = tension
+call Message%WriteValue(' Tension     : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = instability
+call Message%WriteValue(' Instability : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = modality
+call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
+
+
+
+call Message%printMessage(' ')
+call Message%printMessage( (/ ' Diminished Chords ', & 
+                              ' ----------------- ', &
+                              '                   ' /) )
+
+do i=0,2
+  dissonance(i+1) = self%triad_dissonance(self%TC%diminished(2+3*i)-self%TC%diminished(1+3*i)) + &
+                    self%triad_dissonance(self%TC%diminished(3+3*i)-self%TC%diminished(1+3*i)) + &
+                    self%triad_dissonance(self%TC%diminished(3+3*i)-self%TC%diminished(2+3*i))
+  tension(i+1) = self%triad_tension(self%TC%diminished(1+3*i),self%TC%diminished(2+3*i),self%TC%diminished(3+3*i))
+  modality(i+1) = self%triad_modality(self%TC%diminished(1+3*i),self%TC%diminished(2+3*i),self%TC%diminished(3+3*i))
+end do
+instability = dissonance + self%fits%delta * tension 
+
+io_real(1:3) = dissonance
+call Message%printMessage('                R        1        2')
+call Message%WriteValue(' Dissonance  : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = tension
+call Message%WriteValue(' Tension     : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = instability
+call Message%WriteValue(' Instability : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = modality
+call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
+
+call Message%printMessage(' ')
+call Message%printMessage( (/ ' Suspended 4th Chords ', & 
+                              ' -------------------- ', &
+                              '                      ' /) )
+
+
+do i=0,2
+  dissonance(i+1) = self%triad_dissonance(self%TC%suspended(2+3*i)-self%TC%suspended(1+3*i)) + &
+                    self%triad_dissonance(self%TC%suspended(3+3*i)-self%TC%suspended(1+3*i)) + &
+                    self%triad_dissonance(self%TC%suspended(3+3*i)-self%TC%suspended(2+3*i))
+  tension(i+1) = self%triad_tension(self%TC%suspended(1+3*i),self%TC%suspended(2+3*i),self%TC%suspended(3+3*i))
+  modality(i+1) = self%triad_modality(self%TC%suspended(1+3*i),self%TC%suspended(2+3*i),self%TC%suspended(3+3*i))
+end do
+instability = dissonance + self%fits%delta * tension 
+
+io_real(1:3) = dissonance
+call Message%printMessage('                R        1        2')
+call Message%WriteValue(' Dissonance  : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = tension
+call Message%WriteValue(' Tension     : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = instability
+call Message%WriteValue(' Instability : ', io_real, 3, frm="(3(F8.3,' '))")
+io_real(1:3) = modality
+call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
+
+
+end subroutine triad_
+
+
+
+!--------------------------------------------------------------------------
+recursive subroutine triadplots_(self, progname, progdesc)
+!DEC$ ATTRIBUTES DLLEXPORT :: triadplots_
+  !! author: MDG
+  !! date: 08/06/25
+  !!
+  !! computes the dissonance, tension, and modality plots on a hexagonal grid
+  !! with thw first and second interval as its makor axes (which are at 60° from each other)
+  !!
+
+use mod_io 
+
+IMPLICIT NONE
+
+class(Triad_T),INTENT(INOUT)      :: self 
+character(fnlen),INTENT(IN)       :: progname
+character(fnlen),INTENT(IN)       :: progdesc
+
+type(IO_T)                        :: Message 
+
+
+    
+end subroutine triadplots_
 
 end module
