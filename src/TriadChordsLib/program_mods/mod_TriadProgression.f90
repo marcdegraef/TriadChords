@@ -128,8 +128,6 @@ IMPLICIT NONE
 
 type(TriadProgression_T), INTENT(INOUT)  :: self 
 
-call reportDestructor('TriadProgression_T')
-
 end subroutine TriadProgression_destructor
 
 !--------------------------------------------------------------------------

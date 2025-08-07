@@ -30,16 +30,14 @@ module mod_triads
 
 use mod_global
 use mod_kinds 
-use mod_parameters
-
-! parameters that have to do with musical quantities
-
+use mod_parameters     ! parameters that have to do with musical quantities
 
 type, public :: Triad_T
   private 
     character(fnlen)            :: sourcepath
-    type(fit_parameters)        :: fits    
+    type(fit_parameters),public :: fits    
     type(timbre_descriptor)     :: timbre_parameters
+    type(triad_colors)          :: clrs
     type(triad_chords)          :: TC
 
 ! then a few allocatable arrays
@@ -53,10 +51,13 @@ contains
   private
 
     procedure, pass(self) :: triad_
-    procedure, pass(self) :: triadplots_
     procedure, pass(self) :: triad_dissonance_
     procedure, pass(self) :: triad_tension_
     procedure, pass(self) :: triad_modality_
+    procedure, pass(self) :: totalquantity_
+    procedure, pass(self) :: get_dissonance_
+    procedure, pass(self) :: get_tension_
+    procedure, pass(self) :: get_modality_
     procedure, pass(self) :: setbase_
     procedure, pass(self) :: getbase_
     procedure, pass(self) :: settimbre_type_
@@ -65,12 +66,16 @@ contains
     procedure, pass(self) :: getnum_partials_
     procedure, pass(self) :: setsourcepath_
     procedure, pass(self) :: getsourcepath_
+    procedure, pass(self) :: getclrs_
 
     generic, public :: triad => triad_
-    generic, public :: triadplots => triadplots_
     generic, public :: triad_dissonance => triad_dissonance_
     generic, public :: triad_tension => triad_tension_
     generic, public :: triad_modality => triad_modality_
+    generic, public :: totalquantity => totalquantity_
+    generic, public :: get_dissonance => get_dissonance_
+    generic, public :: get_tension => get_tension_
+    generic, public :: get_modality => get_modality_
     generic, public :: setbase => setbase_
     generic, public :: getbase => getbase_
     generic, public :: settimbre_type => settimbre_type_
@@ -79,6 +84,7 @@ contains
     generic, public :: getnum_partials => getnum_partials_
     generic, public :: setsourcepath => setsourcepath_
     generic, public :: getsourcepath => getsourcepath_
+    generic, public :: getclrs => getclrs_
 
 end type Triad_T
 
@@ -387,6 +393,33 @@ out = self%sourcepath
 end function getsourcepath_
 
 !--------------------------------------------------------------------------
+subroutine getclrs_(self, R, G, B )
+!DEC$ ATTRIBUTES DLLEXPORT :: getclrs_
+!! author: MDG
+!! version: 1.0
+!! date: 08/06/25
+!!
+!! get the color tables 
+
+use ISO_C_BINDING
+use, intrinsic :: iso_fortran_env
+
+IMPLICIT NONE
+
+class(Triad_T), INTENT(INOUT) :: self
+integer(int8),INTENT(INOUT)   :: R(256)
+integer(int8),INTENT(INOUT)   :: G(256)
+integer(int8),INTENT(INOUT)   :: B(256)
+
+type(triad_colors)            :: TC 
+
+R = TC%Red
+G = TC%Green
+B = TC%Blue
+
+end subroutine getclrs_
+
+!--------------------------------------------------------------------------
 recursive function triad_dissonance_(self, x) result(itd)
 !DEC$ ATTRIBUTES DLLEXPORT :: triad_dissonance_
   !! author: MDG
@@ -490,11 +523,13 @@ real(kind=dbl)                    :: x,y,tmp               ! intervals
 real(kind=dbl)                    :: p1,p2,p3(3)           ! auxiliary variables
 integer(kind=irg)                 :: i,j,k,ii,jj,istat,s1,s2,s3  ! loop counters etc
 integer(kind=irg)                 :: iswap1,iswap(1), np
+real(kind=dbl),allocatable        :: q2(:)
 
 
 x = i2-i1
 y = i3-i1
 np = dble(self%timbre_parameters%num_partials+1)
+allocate( q2( (self%timbre_parameters%num_partials+1)**3 ))
 
 jj =1 
 do i=0,self%timbre_parameters%num_partials
@@ -513,7 +548,7 @@ do i=0,self%timbre_parameters%num_partials
                 p3(iswap1) = tmp
         endif
       end do
-      self%q2(jj) = self%fits%eps* (p3(1)-2.D0*p3(2)+p3(3))
+      q2(jj) = self%fits%eps* (p3(1)-2.D0*p3(2)+p3(3))
       self%q3(jj) = 0.25D0 * (p3(1)-2.D0*p3(2)+p3(3))**4
       if (self%q3(jj).gt.100.D0) then 
         self%q3(jj) = 0.D0
@@ -524,10 +559,210 @@ do i=0,self%timbre_parameters%num_partials
     end do
   end do
 end do
-itm = - sum(self%prods * self%q2 * self%q3) ! / np
+itm = - sum(self%prods * q2 * self%q3) ! / np
+
+deallocate(q2)
 
 end function triad_modality_
 
+!--------------------------------------------------------------------------
+recursive function totalquantity_(self,f1,f2,f3,Q) result(S)
+!DEC$ ATTRIBUTES DLLEXPORT :: totalquantity_
+  !! author: MDG
+  !! date: 08/06/25
+  !!
+  !! computes the total dissonance/tension/modality
+
+IMPLICIT NONE
+
+class(Triad_T),INTENT(INOUT)      :: self 
+real(kind=dbl),INTENT(IN)         :: f1
+real(kind=dbl),INTENT(IN)         :: f2
+real(kind=dbl),INTENT(IN)         :: f3
+character(1),INTENT(IN)           :: Q
+real(kind=dbl)                    :: S
+
+integer(kind=irg)                 :: i1, i2, i3, num 
+real(kind=dbl)                    :: ff1, ff2, ff3, vv1, vv2, vv3
+
+num = self%timbre_parameters%num_partials
+
+S = 0.D0
+do i1=0,num
+  ff1 = f1 * dble(i1+1)
+  vv1 = self%timbre(i1)
+  do i2=0,num
+    ff2 = f2 * dble(i2+1)
+    vv2 = self%timbre(i2)
+    do i3=0,num
+      ff3 = f3 * dble(i3+1)
+      vv3 = self%timbre(i3)
+      if (Q.eq.'D') S = S + self%get_dissonance_(ff1, ff2, ff3, vv1, vv2, vv3)
+      if (Q.eq.'T') S = S + self%get_tension_(ff1, ff2, ff3, vv1, vv2, vv3)
+      if (Q.eq.'M') S = S + self%get_modality_(ff1, ff2, ff3, vv1, vv2, vv3)
+    end do 
+  end do 
+end do
+
+end function totalquantity_
+
+!--------------------------------------------------------------------------
+recursive function get_dissonance_(self,f1,f2,f3,v1,v2,v3) result(D)
+!DEC$ ATTRIBUTES DLLEXPORT :: get_dissonance_
+  !! author: MDG
+  !! date: 08/06/25
+  !!
+  !! computes the dissonance of a triad of frequencies
+  !!
+  !! this function returns the dissonance based on the 
+  !! relations in W.A. Sethares, J. Acoust. Soc. Am. v. 94 1218 (1993)
+
+IMPLICIT NONE
+
+class(Triad_T),INTENT(INOUT)      :: self
+real(kind=dbl),INTENT(IN)         :: f1
+real(kind=dbl),INTENT(IN)         :: f2
+real(kind=dbl),INTENT(IN)         :: f3
+real(kind=dbl),INTENT(IN)         :: v1
+real(kind=dbl),INTENT(IN)         :: v2
+real(kind=dbl),INTENT(IN)         :: v3
+real(kind=dbl)                    :: D
+
+integer(kind=irg)                 :: iswap1,iswap(1),ii
+real(kind=dbl)                    :: x, y, z, f(3), v(3), tmp 
+
+f = (/ f1, f2, f3 /)
+v = (/ v1, v2, v3 /)
+
+! rank them large to small 
+do ii=1,2
+  iswap = maxloc(f(ii:3))
+  iswap1 = iswap(1)+ii-1
+  if (iswap1.ne.ii) then 
+    tmp = f(ii)
+    f(ii) = f(iswap1)
+    f(iswap1) = tmp
+    tmp = v(ii)
+    v(ii) = v(iswap1)
+    v(iswap1) = tmp
+  endif
+end do
+
+x = (self%fits%freq2int*log10(f(2)/f(3)))**self%fits%gam
+y = (self%fits%freq2int*log10(f(1)/f(2)))**self%fits%gam
+z = (self%fits%freq2int*log10(f(1)/f(3)))**self%fits%gam
+
+D = 0.D0 
+if (x.lt.100.D0) D = D + v(2) * v(3) * ( exp(-self%fits%b1*x) - exp(-self%fits%b2*x) )
+if (y.lt.100.D0) D = D + v(1) * v(2) * ( exp(-self%fits%b1*y) - exp(-self%fits%b2*y) )
+if (z.lt.100.D0) D = D + v(1) * v(3) * ( exp(-self%fits%b1*z) - exp(-self%fits%b2*z) )
+D = D * self%fits%b3
+
+end function get_dissonance_
+
+!--------------------------------------------------------------------------
+recursive function get_tension_(self,f1,f2,f3,v1,v2,v3) result(T)
+!DEC$ ATTRIBUTES DLLEXPORT :: get_get_tension_dissonance_
+  !! author: MDG
+  !! date: 08/06/25
+  !!
+  !! computes the tension of a triad of frequencies
+  !!
+  !! based on Eq. 1 in Cook and Fujisawa (2006)
+
+IMPLICIT NONE
+
+class(Triad_T),INTENT(INOUT)      :: self
+real(kind=dbl),INTENT(IN)         :: f1
+real(kind=dbl),INTENT(IN)         :: f2
+real(kind=dbl),INTENT(IN)         :: f3
+real(kind=dbl),INTENT(IN)         :: v1
+real(kind=dbl),INTENT(IN)         :: v2
+real(kind=dbl),INTENT(IN)         :: v3
+real(kind=dbl)                    :: T
+
+integer(kind=irg)                 :: iswap1,iswap(1),ii
+real(kind=dbl)                    :: x, y, q, f(3), v, tmp 
+
+f = (/ f1, f2, f3 /)
+v = v1 * v2 * v3
+
+! rank them large to small 
+do ii=1,2
+  iswap = maxloc(f(ii:3))
+  iswap1 = iswap(1)+ii-1
+  if (iswap1.ne.ii) then 
+    tmp = f(ii)
+    f(ii) = f(iswap1)
+    f(iswap1) = tmp
+  endif
+end do
+
+! x = self%fits%freq2int*log10(f(2)/f(1))
+! y = self%fits%freq2int*log10(f(3)/f(2))
+x = self%fits%freq2int*log10(f(2)/f(3))
+y = self%fits%freq2int*log10(f(1)/f(2))
+
+! take the difference, scale by alpha and put in exponential
+q = (y-x)**2 * self%fits%alpha_tension
+if (q.gt.100.D0) then 
+  T = 0.D0 
+else 
+  T = v * exp(-q)
+end if
+
+end function get_tension_
+
+!--------------------------------------------------------------------------
+recursive function get_modality_(self,f1,f2,f3,v1,v2,v3) result(M)
+!DEC$ ATTRIBUTES DLLEXPORT :: get_modality_
+  !! author: MDG
+  !! date: 08/06/25
+  !!
+  !! computes the tension of a triad of frequencies
+  !!
+  !! based on Cook and Fujisawa (2006)
+
+IMPLICIT NONE
+
+class(Triad_T),INTENT(INOUT)      :: self
+real(kind=dbl),INTENT(IN)         :: f1
+real(kind=dbl),INTENT(IN)         :: f2
+real(kind=dbl),INTENT(IN)         :: f3
+real(kind=dbl),INTENT(IN)         :: v1
+real(kind=dbl),INTENT(IN)         :: v2
+real(kind=dbl),INTENT(IN)         :: v3
+real(kind=dbl)                    :: M
+
+integer(kind=irg)                 :: iswap1,iswap(1),ii
+real(kind=dbl)                    :: x, y, q, f(3), v, tmp
+
+f = (/ f1, f2, f3 /)
+v = v1 * v2 * v3
+
+! rank them large to small 
+do ii=1,2
+  iswap = maxloc(f(ii:3))
+  iswap1 = iswap(1)+ii-1
+  if (iswap1.ne.ii) then 
+    tmp = f(ii)
+    f(ii) = f(iswap1)
+    f(iswap1) = tmp
+  endif
+end do
+
+x = self%fits%freq2int*log10(f(2)/f(1))
+y = self%fits%freq2int*log10(f(3)/f(2))
+
+! take the difference, scale by alpha and put in exponential
+q = 0.25D0 * (y-x)**4
+if (q.gt.100.D0) then 
+  M = 0.D0 
+else 
+  M = -2.D0 * v * (y-x) * exp(-q) / self%fits%eps
+end if
+
+end function get_modality_
 
 !--------------------------------------------------------------------------
 recursive subroutine triad_(self, progname, progdesc)
@@ -699,33 +934,6 @@ call Message%WriteValue(' Instability : ', io_real, 3, frm="(3(F8.3,' '))")
 io_real(1:3) = modality
 call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
 
-
 end subroutine triad_
-
-
-
-!--------------------------------------------------------------------------
-recursive subroutine triadplots_(self, progname, progdesc)
-!DEC$ ATTRIBUTES DLLEXPORT :: triadplots_
-  !! author: MDG
-  !! date: 08/06/25
-  !!
-  !! computes the dissonance, tension, and modality plots on a hexagonal grid
-  !! with thw first and second interval as its makor axes (which are at 60° from each other)
-  !!
-
-use mod_io 
-
-IMPLICIT NONE
-
-class(Triad_T),INTENT(INOUT)      :: self 
-character(fnlen),INTENT(IN)       :: progname
-character(fnlen),INTENT(IN)       :: progdesc
-
-type(IO_T)                        :: Message 
-
-
-    
-end subroutine triadplots_
 
 end module

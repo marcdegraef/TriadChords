@@ -29,6 +29,8 @@
 module mod_parameters
 
 use mod_kinds 
+use ISO_C_BINDING
+use, intrinsic :: iso_fortran_env
 
 IMPLICIT NONE
   public
@@ -64,4 +66,105 @@ type triad_chords
   real(kind=dbl)            :: suspended(9) =   dble( (/ 0, 5, 7,  5, 7, 12,  7, 12, 17 /) )
 end type triad_chords
 
+type triad_colors
+  integer(int8) :: Red(256) = &
+  (/    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    3_int8,    7_int8,   11_int8,   15_int8,   19_int8, &
+       23_int8,   27_int8,   31_int8,   35_int8,   39_int8,   43_int8,   47_int8,   51_int8, &
+       55_int8,   59_int8,   63_int8,   67_int8,   71_int8,   75_int8,   79_int8,   83_int8, &
+       87_int8,   91_int8,   95_int8,   99_int8,  103_int8,  107_int8,  111_int8,  115_int8, &
+      119_int8,  123_int8,  127_int8, -125_int8, -121_int8, -117_int8, -113_int8, -109_int8, &
+     -105_int8, -101_int8,  -97_int8,  -93_int8,  -89_int8,  -85_int8,  -81_int8,  -77_int8, &
+      -73_int8,  -69_int8,  -65_int8,  -61_int8,  -57_int8,  -53_int8,  -49_int8,  -45_int8, &
+      -41_int8,  -37_int8,  -33_int8,  -29_int8,  -25_int8,  -21_int8,  -17_int8,  -13_int8, &
+       -9_int8,   -5_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -6_int8,  -10_int8,  -15_int8,  -19_int8,  -23_int8, &
+      -28_int8,  -32_int8,  -37_int8,  -41_int8,  -45_int8,  -50_int8,  -54_int8,  -59_int8, &
+      -63_int8,  -67_int8,  -72_int8,  -76_int8,  -81_int8,  -85_int8,  -89_int8,  -94_int8, &
+      -98_int8, -103_int8, -107_int8, -111_int8, -116_int8, -120_int8, -125_int8, -125_int8 /) 
+  integer(int8) :: Green(256) = &
+  (/    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    3_int8,    7_int8,   11_int8,   15_int8,   19_int8,   23_int8, &
+       27_int8,   31_int8,   35_int8,   39_int8,   43_int8,   47_int8,   51_int8,   55_int8, &
+       59_int8,   63_int8,   67_int8,   71_int8,   75_int8,   79_int8,   83_int8,   87_int8, &
+       91_int8,   95_int8,   99_int8,  103_int8,  107_int8,  111_int8,  115_int8,  119_int8, &
+      123_int8,  127_int8, -125_int8, -121_int8, -117_int8, -113_int8, -109_int8, -105_int8, &
+     -101_int8,  -97_int8,  -93_int8,  -89_int8,  -85_int8,  -81_int8,  -77_int8,  -73_int8, &
+      -69_int8,  -65_int8,  -61_int8,  -57_int8,  -53_int8,  -49_int8,  -45_int8,  -41_int8, &
+      -37_int8,  -33_int8,  -29_int8,  -25_int8,  -21_int8,  -17_int8,  -13_int8,   -9_int8, &
+       -5_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -5_int8,   -9_int8,  -13_int8,  -17_int8,  -21_int8, &
+      -25_int8,  -29_int8,  -33_int8,  -37_int8,  -41_int8,  -45_int8,  -49_int8,  -53_int8, &
+      -57_int8,  -61_int8,  -65_int8,  -69_int8,  -73_int8,  -77_int8,  -81_int8,  -85_int8, &
+      -89_int8,  -93_int8,  -97_int8, -101_int8, -105_int8, -109_int8, -113_int8, -117_int8, &
+     -121_int8, -125_int8,  127_int8,  123_int8,  119_int8,  115_int8,  111_int8,  107_int8, &
+      103_int8,   99_int8,   95_int8,   91_int8,   87_int8,   83_int8,   79_int8,   75_int8, &
+       71_int8,   67_int8,   63_int8,   59_int8,   55_int8,   51_int8,   47_int8,   43_int8, &
+       39_int8,   35_int8,   31_int8,   27_int8,   23_int8,   19_int8,   15_int8,   11_int8, &
+        7_int8,    3_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8 /) 
+  integer(int8) :: Blue(256) = &
+  (/ -125_int8, -125_int8, -121_int8, -117_int8, -113_int8, -109_int8, -105_int8, -101_int8, &
+      -97_int8,  -93_int8,  -89_int8,  -85_int8,  -81_int8,  -77_int8,  -73_int8,  -69_int8, &
+      -65_int8,  -61_int8,  -57_int8,  -53_int8,  -49_int8,  -45_int8,  -41_int8,  -37_int8, &
+      -33_int8,  -29_int8,  -25_int8,  -21_int8,  -17_int8,  -13_int8,   -9_int8,   -5_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8,   -1_int8, &
+       -1_int8,   -1_int8,   -1_int8,   -5_int8,   -9_int8,  -13_int8,  -17_int8,  -21_int8, &
+      -25_int8,  -29_int8,  -33_int8,  -37_int8,  -41_int8,  -45_int8,  -49_int8,  -53_int8, &
+      -57_int8,  -61_int8,  -65_int8,  -69_int8,  -73_int8,  -77_int8,  -81_int8,  -85_int8, &
+      -89_int8,  -93_int8,  -97_int8, -101_int8, -105_int8, -109_int8, -113_int8, -117_int8, &
+     -121_int8, -125_int8,  127_int8,  123_int8,  119_int8,  115_int8,  111_int8,  107_int8, &
+      103_int8,   99_int8,   95_int8,   91_int8,   87_int8,   83_int8,   79_int8,   75_int8, &
+       71_int8,   67_int8,   63_int8,   59_int8,   55_int8,   51_int8,   47_int8,   43_int8, &
+       39_int8,   35_int8,   31_int8,   27_int8,   23_int8,   19_int8,   15_int8,   11_int8, &
+        7_int8,    3_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
+        0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8 /)   
+end type triad_colors
 end module mod_parameters

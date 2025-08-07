@@ -1,0 +1,23 @@
+ &TriadPlots
+! output file for modality plot (bmp or tiff)
+ modality_file = 'undefined',
+! output file for dissonance plot (bmp or tiff)
+ dissonance_file = 'undefined',
+! output file for tension plot (bmp or tiff)
+ tension_file = 'undefined',
+! output file for instability plot (bmp or tiff)
+ instability_file = 'undefined',
+! data output file 
+ data_file = 'undefined',
+! number of pixels per interval
+ scale = 40,
+! range of plot along horizontal axis (in units of intervals)
+ interval_range = 24,
+! coordinate demag factor (if interval_range=24, then actual coordinate range
+! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
+ demag = 2,
+! fundamental frequency (default A4)
+ f1 = 440.D0,
+! weight factor for tension in the instability calculation 
+ delta = 0.2D0,
+ /
