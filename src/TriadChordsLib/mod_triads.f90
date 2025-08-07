@@ -407,9 +407,9 @@ use, intrinsic :: iso_fortran_env
 IMPLICIT NONE
 
 class(Triad_T), INTENT(INOUT) :: self
-integer(int8),INTENT(INOUT)   :: R(256)
-integer(int8),INTENT(INOUT)   :: G(256)
-integer(int8),INTENT(INOUT)   :: B(256)
+integer(int8),INTENT(INOUT)   :: R(0:255)
+integer(int8),INTENT(INOUT)   :: G(0:255)
+integer(int8),INTENT(INOUT)   :: B(0:255)
 
 type(triad_colors)            :: TC 
 

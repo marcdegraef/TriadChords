@@ -67,7 +67,7 @@ type triad_chords
 end type triad_chords
 
 type triad_colors
-  integer(int8) :: Red(256) = &
+  integer(int8) :: Red(0:255) = &
   (/    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
         0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
         0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
@@ -100,7 +100,7 @@ type triad_colors
       -28_int8,  -32_int8,  -37_int8,  -41_int8,  -45_int8,  -50_int8,  -54_int8,  -59_int8, &
       -63_int8,  -67_int8,  -72_int8,  -76_int8,  -81_int8,  -85_int8,  -89_int8,  -94_int8, &
       -98_int8, -103_int8, -107_int8, -111_int8, -116_int8, -120_int8, -125_int8, -125_int8 /) 
-  integer(int8) :: Green(256) = &
+  integer(int8) :: Green(0:255) = &
   (/    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
         0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
         0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
@@ -133,7 +133,7 @@ type triad_colors
         0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
         0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8, &
         0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8,    0_int8 /) 
-  integer(int8) :: Blue(256) = &
+  integer(int8) :: Blue(0:255) = &
   (/ -125_int8, -125_int8, -121_int8, -117_int8, -113_int8, -109_int8, -105_int8, -101_int8, &
       -97_int8,  -93_int8,  -89_int8,  -85_int8,  -81_int8,  -77_int8,  -73_int8,  -69_int8, &
       -65_int8,  -61_int8,  -57_int8,  -53_int8,  -49_int8,  -45_int8,  -41_int8,  -37_int8, &
