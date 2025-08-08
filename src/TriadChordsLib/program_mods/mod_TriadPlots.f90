@@ -678,9 +678,9 @@ type(IO_T)                                :: Message
 
 integer(int8),allocatable                 :: colormap(:,:,:), rect(:,:,:)
 integer(kind=irg)                         :: interval_range, scl, demag, xmax, ymax, i, j, il, iu 
-integer(kind=irg)                         :: iDD
+integer(kind=irg)                         :: iDD, cr
 integer(int8)                             :: R(0:255), G(0:255), B(0:255) 
-real(kind=dbl)                            :: f1, delta, fl, fu, fr, xx, mi, ma, io_real(2)
+real(kind=dbl)                            :: f1, delta, fl, fu, fr, xx, mi, ma, io_real(2), crad, cradsq, cx, cy
 real(kind=dbl),allocatable                :: xline(:), yline(:), TT(:,:), DD(:,:), MM(:,:), Grid(:,:), Grid2(:,:)
 character(fnlen)                          :: TIFF_filename 
 
@@ -832,9 +832,24 @@ do i=1,xmax
   end do 
 end do 
 
+! add the grid
 do i=1,3
   colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
 end do 
+
+! also, add a white circle to clearly identify the origin of the grid
+cr = 5
+crad = dble(cr)   ! circle radius in pixels
+cradsq = crad**2
+cx = dble(xmax)/2.D0
+cy = dble(ymax)/2.D0
+do i=-cr-1,cr+1
+  do j=-cr-1,cr+1
+    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
+      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
+    end if 
+  end do 
+end do
 
 TIFF_filename = trim(self%nml%dissonance_file)
 ! set up the image_t structure
@@ -867,6 +882,15 @@ do i=1,3
   colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
 end do 
 
+! also, add a white circle to clearly identify the origin of the grid
+do i=-cr-1,cr+1
+  do j=-cr-1,cr+1
+    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
+      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
+    end if 
+  end do 
+end do
+
 TIFF_filename = trim(self%nml%tension_file)
 
 ! set up the image_t structure
@@ -898,6 +922,15 @@ end do
 do i=1,3
   colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
 end do 
+
+! also, add a white circle to clearly identify the origin of the grid
+do i=-cr-1,cr+1
+  do j=-cr-1,cr+1
+    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
+      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
+    end if 
+  end do 
+end do
 
 TIFF_filename = trim(self%nml%modality_file)
 
