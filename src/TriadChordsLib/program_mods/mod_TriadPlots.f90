@@ -973,7 +973,7 @@ integer(kind=irg),INTENT(IN)              :: scl
 integer(kind=irg),INTENT(IN)              :: range
 
 real(kind=dbl)                            :: ff, x0, x1, y0, y1, c
-integer(kind=irg)                         :: i
+integer(kind=irg)                         :: i, j
 
 ff = sin(cPi/3.D0)/2.D0 
 c = -1.0D0
@@ -1021,6 +1021,14 @@ y0 = dble(ymax)
 x1 = dble(xmax)
 y1 = dble(ymax)/2.D0
 call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+
+! finally, make the four triangular corners the background color 
+do j=0,ymax/2
+  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), j) = 0.D0
+  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, j) = 0.D0
+  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), ymax-1-j) = 0.D0
+  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, ymax-1-j) = 0.D0
+end do
 
 end subroutine makeGrid_
 
