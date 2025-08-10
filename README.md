@@ -29,11 +29,13 @@ All the executables in this packages use a handfuil of configuration parameters 
  timbre_type = 1,
 ! base factor for timbre type 1
  base = 0.88D0,
+! fundamental frequency (Hz)
+ f1 = 440.0D0,
 ! full path to TriadChords source folder
  sourcepath = 'undefined',
  /                    
 ```
-Set *num_partials* to the number of upper partials (harmonics) to be considered in all simulations.  Currently there are two timbre types available, an exponential type (*timbre_type*=1) of the form $base^n$ where $n$ is the number of the upper partial and *base* is a number between 0 and 1; the default of 0.88 can be thought of as representing a simple guitar string frequency spectrum.  A second timbre type (2) uses a *1/n* sequence of spectral amplitudes for the upper partials.  Finally, the *sourcepath* parameter should be set to the full path of the source code folder installed with the git clone command.  This is needed so that the proper name list template files will be found by the various executables.
+Set *num_partials* to the number of upper partials (harmonics) to be considered in all simulations.  Currently there are two timbre types available, an exponential type (*timbre_type*=1) of the form $base^n$ where $n$ is the number of the upper partial and *base* is a number between 0 and 1; the default of 0.88 can be thought of as representing a simple guitar string frequency spectrum.  A second timbre type (2) uses a *1/n* sequence of spectral amplitudes for the upper partials.  *f1* initializes the fundamental frequency used by several of the programs. Finally, the *sourcepath* parameter should be set to the full path of the source code folder installed with the git clone command.  This is needed so that the proper name list template files will be found by the various executables.
 
 Once the **TriadsConfig.txt** file has been created (and edited as needed), most programs should first be executed with the -t option to generate a copy of the name list template file. This file should be renamed with the .nml extension and edited as needed.  Then the program can be executed without the -t option; if the name list file has the default file name, then it does not need to be passed to the program as a command line parameter.  If the file name is not the default name, then the actual file name must be passed to the program.
 

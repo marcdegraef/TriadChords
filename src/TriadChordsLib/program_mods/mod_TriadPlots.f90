@@ -50,7 +50,6 @@ type, public :: TriadPlotsNameListType
   integer(kind=irg)   :: scale
   integer(kind=irg)   :: interval_range
   integer(kind=irg)   :: demag
-  real(kind=dbl)      :: f1
   real(kind=dbl)      :: delta
 end type TriadPlotsNameListType
 
@@ -82,8 +81,6 @@ private
   procedure, pass(self) :: getinterval_range_
   procedure, pass(self) :: setdemag_
   procedure, pass(self) :: getdemag_
-  procedure, pass(self) :: setf1_
-  procedure, pass(self) :: getf1_
   procedure, pass(self) :: setdelta_
   procedure, pass(self) :: getdelta_
 
@@ -107,8 +104,6 @@ private
   generic, public :: getinterval_range => getinterval_range_
   generic, public :: setdemag => setdemag_
   generic, public :: getdemag => getdemag_
-  generic, public :: setf1 => setf1_
-  generic, public :: getf1 => getf1_
   generic, public :: setdelta => setdelta_
   generic, public :: getdelta => getdelta_
 
@@ -208,11 +203,10 @@ character(fnlen)                      :: data_file
 integer(kind=irg)                     :: scale
 integer(kind=irg)                     :: interval_range
 integer(kind=irg)                     :: demag
-real(kind=dbl)                        :: f1
 real(kind=dbl)                        :: delta
 
 namelist / TriadPlots / modality_file, dissonance_file, tension_file, instability_file, data_file, &
-                        scale, interval_range, demag, f1, delta 
+                        scale, interval_range, demag, delta 
 
 modality_file = 'undefined'
 ! output file for dissonance plot (bmp or tiff)
@@ -230,8 +224,6 @@ interval_range = 24
 ! coordinate demag factor (if interval_range=24, then actual coordinate range
 ! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
 demag = 2
-! fundamental frequency (default A4)
-f1 = 440.D0
 ! weight factor for tension in the instability calculation 
 delta = 0.2D0
 
@@ -269,7 +261,6 @@ self%nml%data_file = data_file
 self%nml%scale = scale
 self%nml%interval_range = interval_range
 self%nml%demag = demag
-self%nml%f1 = f1
 self%nml%delta = delta
 
 end subroutine readNameList_
@@ -581,42 +572,6 @@ out = self%nml%demag
 end function getdemag_
 
 !--------------------------------------------------------------------------
-subroutine setf1_(self,inp)
-!DEC$ ATTRIBUTES DLLEXPORT :: setf1_
-!! author: MDG
-!! version: 1.0
-!! date: 08/06/25
-!!
-!! set f1 in the TriadPlots_T class
-
-IMPLICIT NONE
-
-class(TriadPlots_T), INTENT(INOUT)     :: self
-real(kind=dbl), INTENT(IN)       :: inp
-
-self%nml%f1 = inp
-
-end subroutine setf1_
-
-!--------------------------------------------------------------------------
-function getf1_(self) result(out)
-!DEC$ ATTRIBUTES DLLEXPORT :: getf1_
-!! author: MDG
-!! version: 1.0
-!! date: 08/06/25
-!!
-!! get f1 from the TriadPlots_T class
-
-IMPLICIT NONE
-
-class(TriadPlots_T), INTENT(INOUT)     :: self
-real(kind=dbl)                   :: out
-
-out = self%nml%f1
-
-end function getf1_
-
-!--------------------------------------------------------------------------
 subroutine setdelta_(self,inp)
 !DEC$ ATTRIBUTES DLLEXPORT :: setdelta_
 !! author: MDG
@@ -702,7 +657,6 @@ call Message%printMessage(' ')
 interval_range = self%nml%interval_range
 scl = self%nml%scale
 demag = self%nml%demag
-f1 = self%nml%f1
 delta = self%nml%delta
 
 xmax = scl * interval_range + 1
@@ -721,6 +675,7 @@ DD = 0.D0
 MM = 0.D0
 
 Triad = Triad_T()
+f1 = Triad%getf1()
 
 fr = 1.D0/Triad%fits%freq2int
 
@@ -734,16 +689,16 @@ do il = 0, ymax-1
     if (il.lt.ymax/2) then 
       if ( ((xline(0)-yline(il)*0.5D0).lt.xline(iu)).and.(xline(iu).lt.(xline(xmax-1)+yline(il)*0.5D0)) ) then 
         fu = fl * 10**((xline(iu)-0.5*(yline(il)))*fr)
-        DD(iu, il) = Triad%totalquantity( f1, fl, fu, 'D' )
-        TT(iu, il) = Triad%totalquantity( f1, fl, fu, 'T' )
-        MM(iu, il) = Triad%totalquantity( f1, fl, fu, 'M' )
+        DD(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'D' )
+        TT(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'T' )
+        MM(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'M' )
       end if
     else
       if ( ((xline(0)+yline(il)*0.5D0).lt.xline(iu)).and.(xline(iu).lt.(xline(xmax-1)-yline(il)*0.5D0)) ) then 
         fu = fl * 10**((xline(iu)-0.5*(yline(il)))*fr)
-        DD(iu, il) = Triad%totalquantity( f1, fl, fu, 'D' )
-        TT(iu, il) = Triad%totalquantity( f1, fl, fu, 'T' )
-        MM(iu, il) = Triad%totalquantity( f1, fl, fu, 'M' )
+        DD(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'D' )
+        TT(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'T' )
+        MM(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'M' )
       end if 
     end if 
   end do 
@@ -828,7 +783,7 @@ DD = 255.D0 * ((DD-mi)/(ma-mi))
 do i=1,xmax
   do j=1,ymax
     iDD = nint(DD(i-1,j-1))
-    colormap(1:3,i,ymax+1-j) = (/ R(iDD), G(iDD), B(iDD) /)
+    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
   end do 
 end do 
 
@@ -874,7 +829,7 @@ TT = 255.D0 * ((TT-mi)/(ma-mi))
 do i=1,xmax
   do j=1,ymax
     iDD = nint(TT(i-1,j-1))
-    colormap(1:3,i,ymax+1-j) = (/ R(iDD), G(iDD), B(iDD) /)
+    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
   end do 
 end do 
 
@@ -915,7 +870,7 @@ MM = 255.D0 * ((MM-mi)/(ma-mi))
 do i=1,xmax
   do j=1,ymax
     iDD = nint(MM(i-1,j-1))
-    colormap(1:3,i,ymax+1-j) = (/ R(iDD), G(iDD), B(iDD) /)
+    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
   end do 
 end do 
 
@@ -946,6 +901,53 @@ if(0.ne.iostat) then
   call Message%printMessage(" Failed to write image to file : "//iomsg)
 else
   call Message%printMessage(' modality map written to '//trim(TIFF_filename),"(A)")
+end if
+
+! and finally the instability map 
+DD = DD + self%nml%delta * TT
+mi = minval(DD)
+ma = maxval(DD) 
+DD = 255.D0 * ((DD-mi)/(ma-mi))
+do i=1,xmax
+  do j=1,ymax
+    iDD = nint(DD(i-1,j-1))
+    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
+  end do 
+end do 
+
+! add the grid
+do i=1,3
+  colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
+end do 
+
+! also, add a white circle to clearly identify the origin of the grid
+cr = 5
+crad = dble(cr)   ! circle radius in pixels
+cradsq = crad**2
+cx = dble(xmax)/2.D0
+cy = dble(ymax)/2.D0
+do i=-cr-1,cr+1
+  do j=-cr-1,cr+1
+    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
+      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
+    end if 
+  end do 
+end do
+
+TIFF_filename = trim(self%nml%instability_file)
+! set up the image_t structure
+im = image_t(colormap)
+im%dims = (/ 3, xmax, ymax /)
+im%samplesPerPixel = 3
+im%unsigned = .TRUE.
+if(im%empty()) call Message%printMessage("TriadPlots: failed to convert array to rgb image")
+
+! create the file
+call im%write(trim(TIFF_filename), iostat, iomsg) ! format automatically detected from extension
+if(0.ne.iostat) then
+  call Message%printMessage(" Failed to write image to file : "//iomsg)
+else
+  call Message%printMessage(' instability map written to '//trim(TIFF_filename),"(A)")
 end if
 
 

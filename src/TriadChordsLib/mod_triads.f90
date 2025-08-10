@@ -67,6 +67,9 @@ contains
     procedure, pass(self) :: setsourcepath_
     procedure, pass(self) :: getsourcepath_
     procedure, pass(self) :: getclrs_
+    procedure, pass(self) :: setf1_
+    procedure, pass(self) :: getf1_
+
 
     generic, public :: triad => triad_
     generic, public :: triad_dissonance => triad_dissonance_
@@ -85,6 +88,8 @@ contains
     generic, public :: setsourcepath => setsourcepath_
     generic, public :: getsourcepath => getsourcepath_
     generic, public :: getclrs => getclrs_
+    generic, public :: setf1 => setf1_
+    generic, public :: getf1 => getf1_
 
 end type Triad_T
 
@@ -115,10 +120,10 @@ character(fnlen)                  :: ConfigFile = 'TriadConfig.txt'
 logical                           :: fexists, alloc
 
 integer(kind=irg)                 :: num_partials, timbre_type
-real(kind=dbl)                    :: base 
+real(kind=dbl)                    :: base, f1 
 character(fnlen)                  :: sourcepath
 
-namelist /TriadConfig/ num_partials, timbre_type, base, sourcepath 
+namelist /TriadConfig/ num_partials, timbre_type, base, f1, sourcepath 
 
 ! use a shorthand notation
 associate(Tt => Triad%timbre_parameters)
@@ -142,6 +147,7 @@ if (fexists.eqv..TRUE.) then  ! read the file (formatted as a namelist)
 ! and place the parameters in the class variables
   Tt%num_partials = num_partials
   Tt%base = base
+  Tt%f1 = f1
   Tt%timbre_type = timbre_type
   Triad%sourcepath = trim(sourcepath)
 else  ! generate a template config file and send a message to the user
@@ -153,6 +159,8 @@ else  ! generate a template config file and send a message to the user
                                 " timbre_type = 1,                        ", &
                                 "! base factor for timbre type 1          ", &
                                 " base = 0.88D0,                          ", &
+                                "! fundamental frequency (Hz)             ", &
+                                " f1 = 440.0D0,                           ", &
                                 "! full path to TriadChords source folder ", &
                                 " sourcepath = 'undefined',               ", &
                                 " /                                       " /), redirect = dataunit )
@@ -393,6 +401,42 @@ out = self%sourcepath
 end function getsourcepath_
 
 !--------------------------------------------------------------------------
+subroutine setf1_(self,inp)
+!DEC$ ATTRIBUTES DLLEXPORT :: setf1_
+!! author: MDG
+!! version: 1.0
+!! date: 08/06/25
+!!
+!! set f1 in the TriadPlots_T class
+
+IMPLICIT NONE
+
+class(Triad_T), INTENT(INOUT)    :: self
+real(kind=dbl), INTENT(IN)       :: inp
+
+self%timbre_parameters%f1 = inp
+
+end subroutine setf1_
+
+!--------------------------------------------------------------------------
+function getf1_(self) result(out)
+!DEC$ ATTRIBUTES DLLEXPORT :: getf1_
+!! author: MDG
+!! version: 1.0
+!! date: 08/06/25
+!!
+!! get f1 from the TriadPlots_T class
+
+IMPLICIT NONE
+
+class(Triad_T), INTENT(INOUT)    :: self
+real(kind=dbl)                   :: out
+
+out = self%timbre_parameters%f1
+
+end function getf1_
+
+!--------------------------------------------------------------------------
 subroutine getclrs_(self, R, G, B )
 !DEC$ ATTRIBUTES DLLEXPORT :: getclrs_
 !! author: MDG
@@ -432,17 +476,20 @@ recursive function triad_dissonance_(self, x) result(itd)
 IMPLICIT NONE
 
 class(Triad_T),INTENT(INOUT)          :: self
-real(kind=dbl),INTENT(IN)             :: x                ! the input interval (in units of semitones)
+real(kind=dbl),INTENT(IN)             :: x                ! the input interval (in units of Hertz)
 real(kind=dbl)                        :: itd 
 
-real(kind=dbl)                        :: d, np            ! axiliary variable
+real(kind=dbl)                        :: d, np, xi        ! axiliary variable
 integer(kind=irg)                     :: i,j,i1,istat     ! loop counters, etc...
+
+! convert Hertz to interval units 
+xi = log10(x) * self%fits%freq2int
 
 i1 =1 
 np = dble(self%timbre_parameters%num_partials+1)
 do i=0,self%timbre_parameters%num_partials
   do j=0,self%timbre_parameters%num_partials
-    self%q2(i1) = dabs(self%partials(i) - (x+self%partials(j)))**self%fits%gam
+    self%q2(i1) = dabs(self%partials(i) - (xi+self%partials(j)))**self%fits%gam
     i1 = i1+1
   end do
 end do
@@ -604,6 +651,9 @@ do i1=0,num
   end do 
 end do
 
+if (Q.eq.'D') S = S / dble( 2*(num*num-num) )
+if (Q.eq.'T') S = S / dble( num )
+
 end function totalquantity_
 
 !--------------------------------------------------------------------------
@@ -751,15 +801,16 @@ do ii=1,2
   endif
 end do
 
-x = self%fits%freq2int*log10(f(2)/f(1))
-y = self%fits%freq2int*log10(f(3)/f(2))
+x = self%fits%freq2int*log10(f(1)/f(2))
+y = self%fits%freq2int*log10(f(2)/f(3))
 
 ! take the difference, scale by alpha and put in exponential
 q = 0.25D0 * (y-x)**4
 if (q.gt.100.D0) then 
   M = 0.D0 
 else 
-  M = -2.D0 * v * (y-x) * exp(-q) / self%fits%eps
+  ! M = - v * (y-x) * exp(-q) * self%fits%eps
+  M =   v * (y-x) * exp(-q) * self%fits%eps
 end if
 
 end function get_modality_
@@ -784,7 +835,7 @@ character(fnlen),INTENT(IN)       :: progdesc
 
 type(IO_T)                        :: Message 
 
-real(kind=dbl)                    :: io_real(self%timbre_parameters%num_partials+1)
+real(kind=dbl)                    :: io_real(self%timbre_parameters%num_partials+1), freq(0:20)
 integer(kind=irg)                 :: io_int(1), i
 
 real(kind=dbl)                    :: tension(3), dissonance(3), modality(3), instability(3) 
@@ -809,16 +860,20 @@ io_real = self%partials(0:self%timbre_parameters%num_partials)
 call Message%WriteValue(' Partial values = ', io_real, self%timbre_parameters%num_partials+1, frm="(20(F6.3,' '))")
 call Message%printMessage(' ')
 
+
+! determine all the frequencies needed for these computations
+do i=0,20
+  freq(i) = self%timbre_parameters%f1 * 10**(dble(i)/self%fits%freq2int)
+end do
+
 call Message%printMessage( (/ ' Major Chords ', & 
                               ' ------------ ', &
                               '              ' /) )
 
 do i=0,2
-  dissonance(i+1) = self%triad_dissonance(self%TC%major(2+3*i)-self%TC%major(1+3*i)) + &
-                    self%triad_dissonance(self%TC%major(3+3*i)-self%TC%major(1+3*i)) + &
-                    self%triad_dissonance(self%TC%major(3+3*i)-self%TC%major(2+3*i))
-  tension(i+1) = self%triad_tension(self%TC%major(1+3*i),self%TC%major(2+3*i),self%TC%major(3+3*i))
-  modality(i+1) = self%triad_modality(self%TC%major(1+3*i),self%TC%major(2+3*i),self%TC%major(3+3*i))
+  dissonance(i+1) = self%totalquantity( freq(self%TC%major(1+3*i)), freq(self%TC%major(2+3*i)), freq(self%TC%major(3+3*i)), 'D' )
+  tension(i+1) = self%totalquantity( freq(self%TC%major(1+3*i)), freq(self%TC%major(2+3*i)), freq(self%TC%major(3+3*i)), 'T' )
+  modality(i+1) = self%totalquantity( freq(self%TC%major(1+3*i)), freq(self%TC%major(2+3*i)), freq(self%TC%major(3+3*i)), 'M' )
 end do
 instability = dissonance + self%fits%delta * tension 
 
@@ -839,11 +894,9 @@ call Message%printMessage( (/ ' Minor Chords ', &
                               '              ' /) )
 
 do i=0,2
-  dissonance(i+1) = self%triad_dissonance(self%TC%minor(2+3*i)-self%TC%minor(1+3*i)) + &
-                    self%triad_dissonance(self%TC%minor(3+3*i)-self%TC%minor(1+3*i)) + &
-                    self%triad_dissonance(self%TC%minor(3+3*i)-self%TC%minor(2+3*i))
-  tension(i+1) = self%triad_tension(self%TC%minor(1+3*i),self%TC%minor(2+3*i),self%TC%minor(3+3*i))
-  modality(i+1) = self%triad_modality(self%TC%minor(1+3*i),self%TC%minor(2+3*i),self%TC%minor(3+3*i))
+  dissonance(i+1) = self%totalquantity( freq(self%TC%minor(1+3*i)), freq(self%TC%minor(2+3*i)), freq(self%TC%minor(3+3*i)), 'D' )
+  tension(i+1) = self%totalquantity( freq(self%TC%minor(1+3*i)), freq(self%TC%minor(2+3*i)), freq(self%TC%minor(3+3*i)), 'T' )
+  modality(i+1) = self%totalquantity( freq(self%TC%minor(1+3*i)), freq(self%TC%minor(2+3*i)), freq(self%TC%minor(3+3*i)), 'M' )
 end do
 instability = dissonance + self%fits%delta * tension 
 
@@ -865,11 +918,12 @@ call Message%printMessage( (/ ' Augmented Chords ', &
                               '                  ' /) )
 
 do i=0,2
-  dissonance(i+1) = self%triad_dissonance(self%TC%augmented(2+3*i)-self%TC%augmented(1+3*i)) + &
-                    self%triad_dissonance(self%TC%augmented(3+3*i)-self%TC%augmented(1+3*i)) + &
-                    self%triad_dissonance(self%TC%augmented(3+3*i)-self%TC%augmented(2+3*i))
-  tension(i+1) = self%triad_tension(self%TC%augmented(1+3*i),self%TC%augmented(2+3*i),self%TC%augmented(3+3*i))
-  modality(i+1) = self%triad_modality(self%TC%augmented(1+3*i),self%TC%augmented(2+3*i),self%TC%augmented(3+3*i))
+  dissonance(i+1) = self%totalquantity( freq(self%TC%augmented(1+3*i)), freq(self%TC%augmented(2+3*i)), &
+                                        freq(self%TC%augmented(3+3*i)), 'D' )
+  tension(i+1) =    self%totalquantity( freq(self%TC%augmented(1+3*i)), freq(self%TC%augmented(2+3*i)), &
+                                        freq(self%TC%augmented(3+3*i)), 'T' )
+  modality(i+1) =   self%totalquantity( freq(self%TC%augmented(1+3*i)), freq(self%TC%augmented(2+3*i)), &
+                                        freq(self%TC%augmented(3+3*i)), 'M' )
 end do
 instability = dissonance + self%fits%delta * tension 
 
@@ -891,11 +945,12 @@ call Message%printMessage( (/ ' Diminished Chords ', &
                               '                   ' /) )
 
 do i=0,2
-  dissonance(i+1) = self%triad_dissonance(self%TC%diminished(2+3*i)-self%TC%diminished(1+3*i)) + &
-                    self%triad_dissonance(self%TC%diminished(3+3*i)-self%TC%diminished(1+3*i)) + &
-                    self%triad_dissonance(self%TC%diminished(3+3*i)-self%TC%diminished(2+3*i))
-  tension(i+1) = self%triad_tension(self%TC%diminished(1+3*i),self%TC%diminished(2+3*i),self%TC%diminished(3+3*i))
-  modality(i+1) = self%triad_modality(self%TC%diminished(1+3*i),self%TC%diminished(2+3*i),self%TC%diminished(3+3*i))
+  dissonance(i+1) = self%totalquantity( freq(self%TC%diminished(1+3*i)), freq(self%TC%diminished(2+3*i)), &
+                                        freq(self%TC%diminished(3+3*i)), 'D' )
+  tension(i+1) =    self%totalquantity( freq(self%TC%diminished(1+3*i)), freq(self%TC%diminished(2+3*i)), &
+                                        freq(self%TC%diminished(3+3*i)), 'T' )
+  modality(i+1) =   self%totalquantity( freq(self%TC%diminished(1+3*i)), freq(self%TC%diminished(2+3*i)), &
+                                        freq(self%TC%diminished(3+3*i)), 'M' )
 end do
 instability = dissonance + self%fits%delta * tension 
 
@@ -916,11 +971,12 @@ call Message%printMessage( (/ ' Suspended 4th Chords ', &
 
 
 do i=0,2
-  dissonance(i+1) = self%triad_dissonance(self%TC%suspended(2+3*i)-self%TC%suspended(1+3*i)) + &
-                    self%triad_dissonance(self%TC%suspended(3+3*i)-self%TC%suspended(1+3*i)) + &
-                    self%triad_dissonance(self%TC%suspended(3+3*i)-self%TC%suspended(2+3*i))
-  tension(i+1) = self%triad_tension(self%TC%suspended(1+3*i),self%TC%suspended(2+3*i),self%TC%suspended(3+3*i))
-  modality(i+1) = self%triad_modality(self%TC%suspended(1+3*i),self%TC%suspended(2+3*i),self%TC%suspended(3+3*i))
+  dissonance(i+1) = self%totalquantity( freq(self%TC%suspended(1+3*i)), freq(self%TC%suspended(2+3*i)), &
+                                        freq(self%TC%suspended(3+3*i)), 'D' )
+  tension(i+1) =    self%totalquantity( freq(self%TC%suspended(1+3*i)), freq(self%TC%suspended(2+3*i)), &
+                                        freq(self%TC%suspended(3+3*i)), 'T' )
+  modality(i+1) =   self%totalquantity( freq(self%TC%suspended(1+3*i)), freq(self%TC%suspended(2+3*i)), &
+                                        freq(self%TC%suspended(3+3*i)), 'M' )
 end do
 instability = dissonance + self%fits%delta * tension 
 

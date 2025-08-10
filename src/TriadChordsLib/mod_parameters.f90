@@ -51,6 +51,7 @@ type timbre_descriptor
   real(kind=dbl)            :: base                              ! exponent base for timbre of the type base^n
   integer(kind=irg)         :: timbre_type                       ! 1 for base^n; 2 for 1/n; ...
   integer(kind=irg)         :: num_partials                      ! number of upper partials to include
+  real(kind=dbl)            :: f1                                ! fundamental frequency (Hz)
 end type timbre_descriptor
 
 type scale
@@ -59,11 +60,11 @@ end type scale
 
 ! basic triad chords and their inversions in interval form
 type triad_chords
-  real(kind=dbl)            :: major(9) =       dble( (/ 0, 4, 7,  4, 7, 12,  7, 12, 16 /) )
-  real(kind=dbl)            :: minor(9) =       dble( (/ 0, 3, 7,  3, 7, 12,  7, 12, 15 /) )
-  real(kind=dbl)            :: augmented(9) =   dble( (/ 0, 4, 8,  4, 8, 12,  8, 12, 16 /) )
-  real(kind=dbl)            :: diminished(9) =  dble( (/ 0, 3, 6,  3, 6, 12,  6, 12, 15 /) )
-  real(kind=dbl)            :: suspended(9) =   dble( (/ 0, 5, 7,  5, 7, 12,  7, 12, 17 /) )
+  integer(kind=irg)         :: major(9) =      (/ 0, 4, 7,  4, 7, 12,  7, 12, 16 /) 
+  integer(kind=irg)         :: minor(9) =      (/ 0, 3, 7,  3, 7, 12,  7, 12, 15 /) 
+  integer(kind=irg)         :: augmented(9) =  (/ 0, 4, 8,  4, 8, 12,  8, 12, 16 /) 
+  integer(kind=irg)         :: diminished(9) = (/ 0, 3, 6,  3, 6, 12,  6, 12, 15 /) 
+  integer(kind=irg)         :: suspended(9) =  (/ 0, 5, 7,  5, 7, 12,  7, 12, 17 /) 
 end type triad_chords
 
 type triad_colors

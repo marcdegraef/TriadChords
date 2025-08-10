@@ -5,8 +5,10 @@
  triad2 = 0 3 7, 
 ! chord 3
  triad3 = 0 3 7,
-! number of intervals into which to split two octaves
- numint = 200,
+! number of intervals along horizontal axis
+ numint = 24,
+! step size in units of intervals
+ stepint = 0.1D0,
 ! output file name
  outname = 'undefined',
  /
