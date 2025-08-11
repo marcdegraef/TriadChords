@@ -60,6 +60,8 @@ contains
     procedure, pass(self) :: get_modality_
     procedure, pass(self) :: setbase_
     procedure, pass(self) :: getbase_
+    procedure, pass(self) :: settimbre_
+    procedure, pass(self) :: gettimbre_
     procedure, pass(self) :: settimbre_type_
     procedure, pass(self) :: gettimbre_type_
     procedure, pass(self) :: setnum_partials_
@@ -80,6 +82,8 @@ contains
     generic, public :: get_dissonance => get_dissonance_
     generic, public :: get_tension => get_tension_
     generic, public :: get_modality => get_modality_
+    generic, public :: settimbre => settimbre_
+    generic, public :: gettimbre => gettimbre_
     generic, public :: setbase => setbase_
     generic, public :: getbase => getbase_
     generic, public :: settimbre_type => settimbre_type_
@@ -103,7 +107,7 @@ end interface Triad_T
 contains
 
 !--------------------------------------------------------------------------
-type(Triad_T) function Triad_constructor( no_alloc  ) result(Triad)
+type(Triad_T) function Triad_constructor( no_alloc, no_read, timbre, spath ) result(Triad)
 !DEC$ ATTRIBUTES DLLEXPORT :: Triad_constructor
   !! author: MDG
   !! date: 10/22/08
@@ -115,6 +119,9 @@ use mod_io
 IMPLICIT NONE
 
 logical,INTENT(IN),OPTIONAL       :: no_alloc
+logical,INTENT(IN),OPTIONAL       :: no_read
+type(timbre_descriptor),INTENT(IN),OPTIONAL :: timbre
+character(fnlen),INTENT(IN),OPTIONAL        :: spath
 
 type(IO_T)                        :: Message 
 
@@ -134,43 +141,48 @@ associate(Tt => Triad%timbre_parameters)
 ! make sure the TriadConfig.txt file is present in this folder; if it is not, 
 ! then create it and send a message to the user. If it does exist, read it
 ! and populate the class parameters.
-fexists = .FALSE.
-inquire(file=trim(ConfigFile), exist=fexists)
-if (fexists.eqv..TRUE.) then  ! read the file (formatted as a namelist)
-! read the name list from the config file
-  open(UNIT=dataunit,FILE=trim(ConfigFile),DELIM='apostrophe',STATUS='old')
-  read(UNIT=dataunit,NML=TriadConfig)
-  close(UNIT=dataunit,STATUS='keep')
+if (.not.present(no_read)) then 
+  fexists = .FALSE.
+  inquire(file=trim(ConfigFile), exist=fexists)
+  if (fexists.eqv..TRUE.) then  ! read the file (formatted as a namelist)
+  ! read the name list from the config file
+    open(UNIT=dataunit,FILE=trim(ConfigFile),DELIM='apostrophe',STATUS='old')
+    read(UNIT=dataunit,NML=TriadConfig)
+    close(UNIT=dataunit,STATUS='keep')
 
-! check for required entries
-  if (trim(sourcepath).eq.'undefined') then
-    call Message%printError('Triad_constructor:',' sourcepath undefined in '//ConfigFile)
+  ! check for required entries
+    if (trim(sourcepath).eq.'undefined') then
+      call Message%printError('Triad_constructor:',' sourcepath undefined in '//ConfigFile)
+    end if
+
+  ! and place the parameters in the class variables
+    Tt%num_partials = num_partials
+    Tt%base = base
+    Tt%f1 = f1
+    Tt%timbre_type = timbre_type
+    Triad%sourcepath = trim(sourcepath)
+  else  ! generate a template config file and send a message to the user
+    open( dataunit, file = trim(ConfigFile), status = 'new', form='formatted')
+    call Message%printMessage( (/ " &TriadConfig                            ", &
+                                  "! number of upper partials to include    ", &
+                                  " num_partials = 6,                       ", &
+                                  "! timbre type (1=b^n; 2=1/n)             ", &
+                                  " timbre_type = 1,                        ", &
+                                  "! base factor for timbre type 1          ", &
+                                  " base = 0.88D0,                          ", &
+                                  "! fundamental frequency (Hz)             ", &
+                                  " f1 = 440.0D0,                           ", &
+                                  "! full path to TriadChords source folder ", &
+                                  " sourcepath = 'undefined',               ", &
+                                  " /                                       " /), redirect = dataunit )
+    close(dataunit, status = 'keep')
+    call Message%printMessage(' Configuration file did not exist... created TriadConfig.txt in current folder.')
+    call Message%printError('Triad_constructor',' aborting run; please edit TriadConfig.txt file')
   end if
-
-! and place the parameters in the class variables
-  Tt%num_partials = num_partials
-  Tt%base = base
-  Tt%f1 = f1
-  Tt%timbre_type = timbre_type
-  Triad%sourcepath = trim(sourcepath)
-else  ! generate a template config file and send a message to the user
-  open( dataunit, file = trim(ConfigFile), status = 'new', form='formatted')
-  call Message%printMessage( (/ " &TriadConfig                            ", &
-                                "! number of upper partials to include    ", &
-                                " num_partials = 6,                       ", &
-                                "! timbre type (1=b^n; 2=1/n)             ", &
-                                " timbre_type = 1,                        ", &
-                                "! base factor for timbre type 1          ", &
-                                " base = 0.88D0,                          ", &
-                                "! fundamental frequency (Hz)             ", &
-                                " f1 = 440.0D0,                           ", &
-                                "! full path to TriadChords source folder ", &
-                                " sourcepath = 'undefined',               ", &
-                                " /                                       " /), redirect = dataunit )
-  close(dataunit, status = 'keep')
-  call Message%printMessage(' Configuration file did not exist... created TriadConfig.txt in current folder.')
-  call Message%printError('Triad_constructor',' aborting run; please edit TriadConfig.txt file')
-end if
+else ! use the input timbre to initialize the parameters (used for multi-threaded cases)
+  Triad%timbre_parameters = timbre 
+  Triad%sourcepath = trim(spath) 
+end if 
 
 alloc = .TRUE.
 if (present(no_alloc)) then 
@@ -294,6 +306,42 @@ real(kind=dbl)                   :: out
 out = self%timbre_parameters%base
 
 end function getbase_
+
+!--------------------------------------------------------------------------
+subroutine settimbre_(self,inp)
+!DEC$ ATTRIBUTES DLLEXPORT :: settimbre_
+!! author: MDG
+!! version: 1.0
+!! date: 08/04/25
+!!
+!! set timbre in the Triad_T class
+
+IMPLICIT NONE
+
+class(Triad_T), INTENT(INOUT)             :: self
+type(timbre_descriptor), INTENT(IN)       :: inp
+
+self%timbre_parameters = inp
+
+end subroutine settimbre_
+
+!--------------------------------------------------------------------------
+function gettimbre_(self) result(out)
+!DEC$ ATTRIBUTES DLLEXPORT :: gettimbre_
+!! author: MDG
+!! version: 1.0
+!! date: 08/04/25
+!!
+!! get timbre from the Triad_T class
+
+IMPLICIT NONE
+
+class(Triad_T), INTENT(INOUT)    :: self
+type(timbre_descriptor)          :: out
+
+out = self%timbre_parameters
+
+end function gettimbre_
 
 !--------------------------------------------------------------------------
 subroutine settimbre_type_(self,inp)
@@ -996,7 +1044,7 @@ call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
 end subroutine triad_
 
 !--------------------------------------------------------------------------
-subroutine makeGrid_(self, xmax, ymax, im, scl, range, st)
+subroutine makeGrid_(self, xmax, ymax, im, scl, range)
 !DEC$ ATTRIBUTES DLLEXPORT :: makeGrid_
 !! author: MDG 
 !! version: 1.0 
@@ -1012,7 +1060,6 @@ integer(kind=irg), INTENT(IN)             :: ymax
 real(kind=dbl), INTENT(INOUT)             :: im(xmax, ymax)
 integer(kind=irg),INTENT(IN)              :: scl
 integer(kind=irg),INTENT(IN)              :: range
-character(*),INTENT(IN)                   :: st
 
 real(kind=dbl)                            :: ff, x0, x1, y0, y1, c
 integer(kind=irg)                         :: i, j
@@ -1037,37 +1084,20 @@ do i=1,range-1
   call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
 end do  
 
-if (trim(st).eq.'single') then 
-  do i=0,2*range 
-    if (i.le.range) then 
-      x0 = dble(i*scl)/4.D0
-      x1 = dble(i*scl)/2.D0 + dble(xmax-1)/4.D0
-      y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*scl)*ff, 0.D0 /) )
-      y1 = dble(ymax-1)
-    else
-      x0 = dble(range*scl)/4.D0 + dble((i-range)*scl)/2.D0
-      x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range)*scl)/4.D0
-      y0 = 0.D0
-      y1 = dble(ymax-1)-dble((i-range)*scl)*ff
-    end if 
-    call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
-  end do  
-else
-  do i=0,2*range 
-    if (i.le.range) then 
-      x0 = dble(i*scl)/4.D0
-      x1 = dble(i*scl)/2.D0 + dble(xmax-1)/4.D0
-      y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*scl)*ff, 0.D0 /) )
-      y1 = dble(ymax-1)
-    else
-      x0 = dble(range*scl)/4.D0 + dble((i-range)*scl)/2.D0
-      x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range)*scl)/4.D0
-      y0 = 0.D0
-      y1 = dble(ymax-1)-dble((i-range)*scl)*ff
-    end if 
-    call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
-    end do 
-end if
+do i=0,2*range 
+  if (i.le.range) then 
+    x0 = dble(i*scl)/4.D0
+    x1 = dble(i*scl)/2.D0 + dble(xmax-1)/4.D0
+    y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*scl)*ff, 0.D0 /) )
+    y1 = dble(ymax-1)
+  else
+    x0 = dble(range*scl)/4.D0 + dble((i-range)*scl)/2.D0
+    x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range)*scl)/4.D0
+    y0 = 0.D0
+    y1 = dble(ymax-1)-dble((i-range)*scl)*ff
+  end if 
+  call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+end do  
 
 ! and complete the perimeter of the hexagon
 x0 = 0.D0 

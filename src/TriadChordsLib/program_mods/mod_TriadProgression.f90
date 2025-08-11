@@ -230,6 +230,7 @@ subroutine TriadProgression_(self, progname, progdesc)
 use mod_io 
 use mod_triads
 use mod_image
+use omp_lib
 use ISO_C_BINDING
 use, intrinsic :: iso_fortran_env
 
@@ -239,10 +240,11 @@ class(TriadProgression_T), INTENT(INOUT)        :: self
 character(fnlen), INTENT(INOUT)                 :: progname 
 character(fnlen), INTENT(INOUT)                 :: progdesc
 
-type(Triad_T)                                   :: TT
+type(Triad_T)                                   :: TT, myTT
 type(IO_T)                                      :: Message
 
-integer(kind=sgl)                               :: i,j,k,l,iv11,iv12,iv21,iv22,iv31,iv32,dimx,dimy,numx,numy,istat 
+integer(kind=sgl)                               :: i,j,k,l,iv11,iv12,iv21,iv22,iv31,iv32,dimx,dimy,numx,numy,istat, &
+                                                   TID, io_int(2) 
 real(kind=dbl)                                  :: set1(3), set2(3), set3(3), fr2(3), fr3(3), tt12, p1, p2
 real(kind=dbl)                                  :: tt13, tt23, dd12, dd13, dd23, mm12, mm13, mm23, f1, fr, frat
 real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:), mm(:,:), ran(:), Grid(:,:), Grid2(:,:)
@@ -285,33 +287,48 @@ write(*,*) nml%triad3,': ', set3
 p1 = dble(nml%demag * nml%interval_range/2)
 p2 = p1/2.D0
 
+
+call OMP_SET_NUM_THREADS(OMP_GET_MAX_THREADS())
+io_int(1) = OMP_GET_NUM_THREADS()
+call Message%WriteValue(' -> Number of threads set to ',io_int,1,"(I3)")
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(TID,fr2,fr3,tt13,tt12,tt23,dd13,dd23,dd12,i,j,k,l,myTT) 
+
+TID = OMP_GET_THREAD_NUM()
+
+! initialize a threadsafe copy of the Triad_T class by passing the important parameters
+! to the myTT constructor
+myTT = Triad_T( no_read = .TRUE., timbre = TT%gettimbre(), spath = TT%getsourcepath() )
+
+
+!$OMP DO SCHEDULE(DYNAMIC)
 do j=1,dimy
         fr3 = (p1 * dble(j - (numy+1))/dble(numy)) + set3 ! xx(i) + set2
-        tt13 =        TT%triad_tension(fr3(1),set1(1),set1(2))
-        tt13 = tt13 + TT%triad_tension(fr3(1),set1(1),set1(3))
-        tt13 = tt13 + TT%triad_tension(fr3(1),set1(2),set1(3))
-        tt13 = tt13 + TT%triad_tension(fr3(2),set1(1),set1(2))
-        tt13 = tt13 + TT%triad_tension(fr3(2),set1(1),set1(3))
-        tt13 = tt13 + TT%triad_tension(fr3(2),set1(2),set1(3))
-        tt13 = tt13 + TT%triad_tension(fr3(3),set1(1),set1(2))
-        tt13 = tt13 + TT%triad_tension(fr3(3),set1(1),set1(3))
-        tt13 = tt13 + TT%triad_tension(fr3(3),set1(2),set1(3))
+        tt13 =        myTT%triad_tension(fr3(1),set1(1),set1(2))
+        tt13 = tt13 + myTT%triad_tension(fr3(1),set1(1),set1(3))
+        tt13 = tt13 + myTT%triad_tension(fr3(1),set1(2),set1(3))
+        tt13 = tt13 + myTT%triad_tension(fr3(2),set1(1),set1(2))
+        tt13 = tt13 + myTT%triad_tension(fr3(2),set1(1),set1(3))
+        tt13 = tt13 + myTT%triad_tension(fr3(2),set1(2),set1(3))
+        tt13 = tt13 + myTT%triad_tension(fr3(3),set1(1),set1(2))
+        tt13 = tt13 + myTT%triad_tension(fr3(3),set1(1),set1(3))
+        tt13 = tt13 + myTT%triad_tension(fr3(3),set1(2),set1(3))
         
-        tt13 = tt13 + TT%triad_tension(set1(1),fr3(1),fr3(2))
-        tt13 = tt13 + TT%triad_tension(set1(1),fr3(1),fr3(3))
-        tt13 = tt13 + TT%triad_tension(set1(1),fr3(2),fr3(3))
-        tt13 = tt13 + TT%triad_tension(set1(2),fr3(1),fr3(2))
-        tt13 = tt13 + TT%triad_tension(set1(2),fr3(1),fr3(3))
-        tt13 = tt13 + TT%triad_tension(set1(2),fr3(2),fr3(3))
-        tt13 = tt13 + TT%triad_tension(set1(3),fr3(1),fr3(2))
-        tt13 = tt13 + TT%triad_tension(set1(3),fr3(1),fr3(3))
-        tt13 = tt13 + TT%triad_tension(set1(3),fr3(2),fr3(3))
+        tt13 = tt13 + myTT%triad_tension(set1(1),fr3(1),fr3(2))
+        tt13 = tt13 + myTT%triad_tension(set1(1),fr3(1),fr3(3))
+        tt13 = tt13 + myTT%triad_tension(set1(1),fr3(2),fr3(3))
+        tt13 = tt13 + myTT%triad_tension(set1(2),fr3(1),fr3(2))
+        tt13 = tt13 + myTT%triad_tension(set1(2),fr3(1),fr3(3))
+        tt13 = tt13 + myTT%triad_tension(set1(2),fr3(2),fr3(3))
+        tt13 = tt13 + myTT%triad_tension(set1(3),fr3(1),fr3(2))
+        tt13 = tt13 + myTT%triad_tension(set1(3),fr3(1),fr3(3))
+        tt13 = tt13 + myTT%triad_tension(set1(3),fr3(2),fr3(3))
         tt13 = tt13/18.D0
 
         dd13 = 0.D0
         do k=1,3
                 do l=1,3
-                        dd13 = dd13 + TT%triad_dissonance(dabs(fr3(k)-set1(l)))
+                        dd13 = dd13 + myTT%triad_dissonance(dabs(fr3(k)-set1(l)))
                 end do
         end do
         dd13 = dd13/9.D0
@@ -319,68 +336,76 @@ do j=1,dimy
         do i=1,dimx
 
           fr2 = p1 * dble(i - (numx+1))/dble(numx) + p2 * dble(j - (numy+1))/dble(numy) + set2
-          tt23 =        TT%triad_tension(fr2(1),fr3(1),fr3(2))
-          tt23 = tt23 + TT%triad_tension(fr2(1),fr3(1),fr3(3))
-          tt23 = tt23 + TT%triad_tension(fr2(1),fr3(2),fr3(3))
-          tt23 = tt23 + TT%triad_tension(fr2(2),fr3(1),fr3(2))
-          tt23 = tt23 + TT%triad_tension(fr2(2),fr3(1),fr3(3))
-          tt23 = tt23 + TT%triad_tension(fr2(2),fr3(2),fr3(3))
-          tt23 = tt23 + TT%triad_tension(fr2(3),fr3(1),fr3(2))
-          tt23 = tt23 + TT%triad_tension(fr2(3),fr3(1),fr3(3))
-          tt23 = tt23 + TT%triad_tension(fr2(3),fr3(2),fr3(3))
+          tt23 =        myTT%triad_tension(fr2(1),fr3(1),fr3(2))
+          tt23 = tt23 + myTT%triad_tension(fr2(1),fr3(1),fr3(3))
+          tt23 = tt23 + myTT%triad_tension(fr2(1),fr3(2),fr3(3))
+          tt23 = tt23 + myTT%triad_tension(fr2(2),fr3(1),fr3(2))
+          tt23 = tt23 + myTT%triad_tension(fr2(2),fr3(1),fr3(3))
+          tt23 = tt23 + myTT%triad_tension(fr2(2),fr3(2),fr3(3))
+          tt23 = tt23 + myTT%triad_tension(fr2(3),fr3(1),fr3(2))
+          tt23 = tt23 + myTT%triad_tension(fr2(3),fr3(1),fr3(3))
+          tt23 = tt23 + myTT%triad_tension(fr2(3),fr3(2),fr3(3))
           
-          tt23 = tt23 + TT%triad_tension(fr3(1),fr2(1),fr2(2))
-          tt23 = tt23 + TT%triad_tension(fr3(1),fr2(1),fr2(3))
-          tt23 = tt23 + TT%triad_tension(fr3(1),fr2(2),fr2(3))
-          tt23 = tt23 + TT%triad_tension(fr3(2),fr2(1),fr2(2))
-          tt23 = tt23 + TT%triad_tension(fr3(2),fr2(1),fr2(3))
-          tt23 = tt23 + TT%triad_tension(fr3(2),fr2(2),fr2(3))
-          tt23 = tt23 + TT%triad_tension(fr3(3),fr2(1),fr2(2))
-          tt23 = tt23 + TT%triad_tension(fr3(3),fr2(1),fr2(3))
-          tt23 = tt23 + TT%triad_tension(fr3(3),fr2(2),fr2(3))
+          tt23 = tt23 + myTT%triad_tension(fr3(1),fr2(1),fr2(2))
+          tt23 = tt23 + myTT%triad_tension(fr3(1),fr2(1),fr2(3))
+          tt23 = tt23 + myTT%triad_tension(fr3(1),fr2(2),fr2(3))
+          tt23 = tt23 + myTT%triad_tension(fr3(2),fr2(1),fr2(2))
+          tt23 = tt23 + myTT%triad_tension(fr3(2),fr2(1),fr2(3))
+          tt23 = tt23 + myTT%triad_tension(fr3(2),fr2(2),fr2(3))
+          tt23 = tt23 + myTT%triad_tension(fr3(3),fr2(1),fr2(2))
+          tt23 = tt23 + myTT%triad_tension(fr3(3),fr2(1),fr2(3))
+          tt23 = tt23 + myTT%triad_tension(fr3(3),fr2(2),fr2(3))
           tt23 = tt23/18.D0
 
           dd23 = 0.D0
           do k=1,3
                   do l=1,3
-                          dd23 = dd23 + TT%triad_dissonance(dabs(fr2(k)-fr3(l)))
+                          dd23 = dd23 + myTT%triad_dissonance(dabs(fr2(k)-fr3(l)))
                   end do
           end do
           dd23 = dd23/9.D0
 
-          tt12 =        TT%triad_tension(set1(1),fr2(1),fr2(2))
-          tt12 = tt12 + TT%triad_tension(set1(1),fr2(1),fr2(3))
-          tt12 = tt12 + TT%triad_tension(set1(1),fr2(2),fr2(3))
-          tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(2))
-          tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(3))
-          tt12 = tt12 + TT%triad_tension(set1(2),fr2(2),fr2(3))
-          tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(2))
-          tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(3))
-          tt12 = tt12 + TT%triad_tension(set1(3),fr2(2),fr2(3))
+          tt12 =        myTT%triad_tension(set1(1),fr2(1),fr2(2))
+          tt12 = tt12 + myTT%triad_tension(set1(1),fr2(1),fr2(3))
+          tt12 = tt12 + myTT%triad_tension(set1(1),fr2(2),fr2(3))
+          tt12 = tt12 + myTT%triad_tension(set1(2),fr2(1),fr2(2))
+          tt12 = tt12 + myTT%triad_tension(set1(2),fr2(1),fr2(3))
+          tt12 = tt12 + myTT%triad_tension(set1(2),fr2(2),fr2(3))
+          tt12 = tt12 + myTT%triad_tension(set1(3),fr2(1),fr2(2))
+          tt12 = tt12 + myTT%triad_tension(set1(3),fr2(1),fr2(3))
+          tt12 = tt12 + myTT%triad_tension(set1(3),fr2(2),fr2(3))
           
-          tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(2))
-          tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(3))
-          tt12 = tt12 + TT%triad_tension(fr2(1),set1(2),set1(3))
-          tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(2))
-          tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(3))
-          tt12 = tt12 + TT%triad_tension(fr2(2),set1(2),set1(3))
-          tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(2))
-          tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(3))
-          tt12 = tt12 + TT%triad_tension(fr2(3),set1(2),set1(3))
+          tt12 = tt12 + myTT%triad_tension(fr2(1),set1(1),set1(2))
+          tt12 = tt12 + myTT%triad_tension(fr2(1),set1(1),set1(3))
+          tt12 = tt12 + myTT%triad_tension(fr2(1),set1(2),set1(3))
+          tt12 = tt12 + myTT%triad_tension(fr2(2),set1(1),set1(2))
+          tt12 = tt12 + myTT%triad_tension(fr2(2),set1(1),set1(3))
+          tt12 = tt12 + myTT%triad_tension(fr2(2),set1(2),set1(3))
+          tt12 = tt12 + myTT%triad_tension(fr2(3),set1(1),set1(2))
+          tt12 = tt12 + myTT%triad_tension(fr2(3),set1(1),set1(3))
+          tt12 = tt12 + myTT%triad_tension(fr2(3),set1(2),set1(3))
           tt12 = tt12/18.D0
 
           dd12 = 0.D0
           do k=1,3
                   do l=1,3
-                          dd12 = dd12 + TT%triad_dissonance(dabs(set1(k)-fr2(l)))
+                          dd12 = dd12 + myTT%triad_dissonance(dabs(set1(k)-fr2(l)))
                   end do
           end do
           dd12 = dd12/9.D0
 
+ !$OMP CRITICAL
           dd(i,j)  = dd12+dd23+dd13
           ttt(i,j) = tt12+tt23+tt13
+ !$OMP END CRITICAL
         end do
+      if (mod(j,50).eq.0) then 
+        io_int = (/ j, dimy /)
+        call Message%WriteValue(' completed ',io_int, 2, frm="(I4,' of ',I4,' lines')")
+      end if
 end do
+!$OMP END DO
+!$OMP END PARALLEL
 
 ! to do:
 !   - background subtraction 
@@ -393,7 +418,7 @@ ttt(1:3,1) = ttt(4,1)
 allocate(Grid(dimx,dimy), Grid2(0:dimx-1,0:dimy-1))
 Grid  = 1.D0
 Grid2 = 1.D0
-call TT%makeGrid(dimx, dimy, Grid2, nml%scale, nml%interval_range, 'triad')
+call TT%makeGrid(dimx, dimy, Grid2, nml%scale, nml%interval_range)
 
 ! binarize the Grid to 1 and 0 
 do i=1,dimx

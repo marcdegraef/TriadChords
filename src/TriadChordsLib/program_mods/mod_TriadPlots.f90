@@ -706,7 +706,7 @@ call Message%printMessage(' ')
 allocate(Grid(0:xmax-1,0:ymax-1), Grid2(0:xmax-1,0:ymax-1))
 Grid  = 1.D0
 Grid2 = 1.D0
-call Triad%makeGrid(xmax, ymax, Grid2, scl, interval_range, 'single')
+call Triad%makeGrid(xmax, ymax, Grid2, scl, interval_range)
 
 ! binarize the Grid to 1 and 0  and flip it vertically 
 do i=0,xmax-1
