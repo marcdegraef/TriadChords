@@ -5,10 +5,13 @@
  triad2 = 0 3 7, 
 ! chord 3
  triad3 = 0 3 7,
-! number of intervals along horizontal axis
- numint = 24,
-! step size in units of intervals
- stepint = 0.1D0,
+! number of pixels per interval
+ scale = 40,
+! range of plot along horizontal axis (in units of intervals)
+ interval_range = 24,
+! coordinate demag factor (if interval_range=24, then actual coordinate range
+! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
+ demag = 2,
 ! output file name
  outname = 'undefined',
  /

@@ -69,7 +69,8 @@ contains
     procedure, pass(self) :: getclrs_
     procedure, pass(self) :: setf1_
     procedure, pass(self) :: getf1_
-
+    procedure, pass(self) :: makeGrid_
+    procedure, pass(self) :: saveColorMap_
 
     generic, public :: triad => triad_
     generic, public :: triad_dissonance => triad_dissonance_
@@ -90,6 +91,8 @@ contains
     generic, public :: getclrs => getclrs_
     generic, public :: setf1 => setf1_
     generic, public :: getf1 => getf1_
+    generic, public :: makeGrid => makeGrid_
+    generic, public :: saveColorMap => saveColorMap_
 
 end type Triad_T
 
@@ -483,13 +486,13 @@ real(kind=dbl)                        :: d, np, xi        ! axiliary variable
 integer(kind=irg)                     :: i,j,i1,istat     ! loop counters, etc...
 
 ! convert Hertz to interval units 
-xi = log10(x) * self%fits%freq2int
+! xi = log10(x) * self%fits%freq2int
 
 i1 =1 
 np = dble(self%timbre_parameters%num_partials+1)
 do i=0,self%timbre_parameters%num_partials
   do j=0,self%timbre_parameters%num_partials
-    self%q2(i1) = dabs(self%partials(i) - (xi+self%partials(j)))**self%fits%gam
+    self%q2(i1) = dabs(self%partials(i) - (x+self%partials(j)))**self%fits%gam
     i1 = i1+1
   end do
 end do
@@ -991,5 +994,337 @@ io_real(1:3) = modality
 call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
 
 end subroutine triad_
+
+!--------------------------------------------------------------------------
+subroutine makeGrid_(self, xmax, ymax, im, scl, range, st)
+!DEC$ ATTRIBUTES DLLEXPORT :: makeGrid_
+!! author: MDG 
+!! version: 1.0 
+!! date: 08/07/25
+!!
+!! add a hexagonal grid to an image 
+
+IMPLICIT NONE 
+
+class(Triad_T), INTENT(INOUT)             :: self
+integer(kind=irg), INTENT(IN)             :: xmax
+integer(kind=irg), INTENT(IN)             :: ymax
+real(kind=dbl), INTENT(INOUT)             :: im(xmax, ymax)
+integer(kind=irg),INTENT(IN)              :: scl
+integer(kind=irg),INTENT(IN)              :: range
+character(*),INTENT(IN)                   :: st
+
+real(kind=dbl)                            :: ff, x0, x1, y0, y1, c
+integer(kind=irg)                         :: i, j
+
+ff = sin(cPi/3.D0)/2.D0 
+c = -1.0D0
+
+! horizontal grid lines
+do i=1,range 
+  x0 = dble(xmax-1)/4.D0-dble(i*scl)/4.D0
+  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*scl)/4.D0, dble(xmax-1) /) )
+  y0 = dble(i*scl)*ff
+  y1 = y0
+  call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+end do  
+
+do i=1,range-1 
+  x0 = dble(xmax-1)/4.D0-dble(i*scl)/4.D0
+  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*scl)/4.D0, dble(xmax-1) /) )
+  y0 = dble(ymax-1)-dble(i*scl)*ff
+  y1 = y0
+  call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+end do  
+
+if (trim(st).eq.'single') then 
+  do i=0,2*range 
+    if (i.le.range) then 
+      x0 = dble(i*scl)/4.D0
+      x1 = dble(i*scl)/2.D0 + dble(xmax-1)/4.D0
+      y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*scl)*ff, 0.D0 /) )
+      y1 = dble(ymax-1)
+    else
+      x0 = dble(range*scl)/4.D0 + dble((i-range)*scl)/2.D0
+      x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range)*scl)/4.D0
+      y0 = 0.D0
+      y1 = dble(ymax-1)-dble((i-range)*scl)*ff
+    end if 
+    call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+  end do  
+else
+  do i=0,2*range 
+    if (i.le.range) then 
+      x0 = dble(i*scl)/4.D0
+      x1 = dble(i*scl)/2.D0 + dble(xmax-1)/4.D0
+      y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*scl)*ff, 0.D0 /) )
+      y1 = dble(ymax-1)
+    else
+      x0 = dble(range*scl)/4.D0 + dble((i-range)*scl)/2.D0
+      x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range)*scl)/4.D0
+      y0 = 0.D0
+      y1 = dble(ymax-1)-dble((i-range)*scl)*ff
+    end if 
+    call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+    end do 
+end if
+
+! and complete the perimeter of the hexagon
+x0 = 0.D0 
+y0 = dble(ymax/2) 
+x1 = dble(xmax)/4.D0 
+y1 = 0.D0
+call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+
+x0 = 3.D0*dble(xmax)/4.D0
+y0 = dble(ymax) 
+x1 = dble(xmax)
+y1 = dble(ymax)/2.D0
+call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
+
+! finally, make the four triangular corners the background color 
+do j=0,ymax/2
+  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), j) = 0.D0
+  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, j) = 0.D0
+  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), ymax-1-j) = 0.D0
+  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, ymax-1-j) = 0.D0
+end do
+
+end subroutine makeGrid_
+
+!--------------------------------------------------------------------------
+subroutine saveColorMap_(self, xmax, ymax, ima, grid, fname)
+!DEC$ ATTRIBUTES DLLEXPORT :: saveColorMap_
+!! author: MDG 
+!! version: 1.0 
+!! date: 08/07/25
+!!
+!! add a hexagonal grid to an image 
+
+use mod_image
+use mod_io
+use ISO_C_BINDING
+use, intrinsic :: iso_fortran_env
+
+
+IMPLICIT NONE 
+
+class(Triad_T), INTENT(INOUT)             :: self
+integer(kind=irg), INTENT(IN)             :: xmax
+integer(kind=irg), INTENT(IN)             :: ymax
+real(kind=dbl), INTENT(INOUT)             :: ima(xmax, ymax)
+real(kind=dbl), INTENT(INOUT)             :: grid(xmax, ymax)
+character(fnlen), INTENT(IN)              :: fname
+
+type(IO_T)                                :: Message 
+
+character(fnlen)                          :: TIFF_filename 
+integer(int8),allocatable                 :: colormap(:,:,:)
+integer(kind=irg)                         :: iDD, cr, i, j
+integer(int8)                             :: R(0:255), G(0:255), B(0:255) 
+real(kind=dbl)                            :: mi, ma, crad, cradsq, cx, cy
+
+! declare variables for use in object oriented image module
+integer                                   :: iostat, io_int(2)
+character(len=128)                        :: iomsg
+logical                                   :: isInteger, OPC, PUC
+type(image_t)                             :: im
+integer                                   :: dim2(2), Pm
+integer(c_int32_t)                        :: result
+
+
+call self%getclrs(R,G,B)
+allocate( colormap(3, xmax, ymax) )
+
+! start with the dissonance map 
+mi = minval(ima)
+ma = maxval(ima) 
+ima = 255.D0 * ((ima-mi)/(ma-mi))
+do i=1,xmax
+  do j=1,ymax
+    iDD = nint(ima(i,j))
+    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
+  end do 
+end do 
+
+! add the grid
+do i=1,3
+  colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(1:xmax,1:ymax)
+end do 
+
+! also, add a white circle to clearly identify the origin of the grid
+cr = 5
+crad = dble(cr)   ! circle radius in pixels
+cradsq = crad**2
+cx = dble(xmax)/2.D0
+cy = dble(ymax)/2.D0
+do i=-cr-1,cr+1
+  do j=-cr-1,cr+1
+    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
+      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
+    end if 
+  end do 
+end do
+
+TIFF_filename = trim(fname)
+! set up the image_t structure
+im = image_t(colormap)
+im%dims = (/ 3, xmax, ymax /)
+im%samplesPerPixel = 3
+im%unsigned = .TRUE.
+if(im%empty()) call Message%printMessage("saveColorMap_: failed to convert array to rgb image")
+
+! create the file
+call im%write(trim(TIFF_filename), iostat, iomsg) ! format automatically detected from extension
+if(0.ne.iostat) then
+  call Message%printMessage(" Failed to write image to file : "//iomsg)
+else
+  call Message%printMessage(' Color map written to '//trim(TIFF_filename),"(A)")
+end if
+
+end subroutine saveColorMap_
+
+!--------------------------------------------------------------------------
+!
+! FUNCTION:DrawLine
+!
+!> @author Marc De Graef, Carnegie Mellon University
+!
+!> @brief use Xiaolin Wu's anti-aliasing algorithm to draw a line on an image array
+!
+!> @param im image on which to draw lines
+!> @param nx x-dimension 
+!> @param ny y-dimension
+!> @param xy0 first end point 
+!> @param xy1 second end point 
+!> @param c intensity value
+!
+!> @date 02/07/20  MDG 1.0 original
+!--------------------------------------------------------------------------
+recursive subroutine DrawLine(im, nx, ny, x0, y0, x1, y1, c)
+
+IMPLICIT NONE 
+
+integer(kind=irg), INTENT(IN)   :: nx 
+integer(kind=irg), INTENT(IN)   :: ny 
+real(kind=dbl), INTENT(INOUT)   :: im(0:nx-1,0:ny-1)
+real(kind=dbl), INTENT(INOUT)   :: x0, y0, x1, y1
+real(kind=dbl), INTENT(IN)      :: c 
+  
+real(kind=dbl)                  :: dx, dy, gradient, xend, yend, xgap,  intery, tmp
+integer(kind=irg)               :: xpxl1, ypxl1, xpxl2, ypxl2, x
+logical                         :: steep 
+
+! rearrange the coordinates if necessary
+steep = .FALSE.
+if (abs(y1-y0) .gt. abs(x1-x0)) then 
+  call swap(x0, y0)
+  call swap(x1, y1)
+  steep = .TRUE.
+end if
+
+if (x0 .gt. x1) then 
+  call swap(x0, x1)
+  call swap(y0, y1)
+end if 
+
+dx = x1-x0
+dy = y1-y0
+if (dx.eq.0.D0) then 
+  gradient = 1.D0
+else
+  gradient = dy/dx 
+end if
+
+xend = round(x0)
+yend = y0 + gradient*(xend-x0)
+xgap = rfpart(x0+0.5D0)
+xpxl1 = xend 
+ypxl1 = ipart(yend)
+if (steep.eqv..TRUE.) then 
+  im(ypxl1, xpxl1) = im(ypxl1, xpxl1) + rfpart(yend) * xgap * c 
+  im(ypxl1+1, xpxl1) = im(ypxl1+1, xpxl1) + fpart(yend) * xgap * c 
+else
+  im(xpxl1, ypxl1) = im(xpxl1, ypxl1) + rfpart(yend) * xgap * c 
+  im(xpxl1, ypxl1+1) = im(xpxl1, ypxl1+1) + fpart(yend) * xgap * c 
+end if 
+intery = yend + gradient
+
+xend = round(x1)
+yend = y1 + gradient*(xend-x1)
+xgap = fpart(x1+0.5D0)
+xpxl2 = xend 
+ypxl2 = ipart(yend)
+if (steep.eqv..TRUE.) then 
+  im(ypxl2, xpxl2) = im(ypxl2, xpxl2) + rfpart(yend) * xgap * c 
+  im(ypxl2+1, xpxl2) = im(ypxl2+1, xpxl2) + fpart(yend) * xgap * c 
+else
+  im(xpxl2, ypxl2) = im(xpxl2, ypxl2) + rfpart(yend) * xgap * c 
+  im(xpxl2, ypxl2+1) = im(xpxl2, ypxl2+1) + fpart(yend) * xgap * c 
+end if 
+
+if (steep.eqv..TRUE.) then 
+  do x = xpxl1+1, xpxl2-1 
+    im( ipart(intery), x) = im( ipart(intery), x) + rfpart(intery) * c 
+    im( ipart(intery)+1, x) = im( ipart(intery)+1, x) + fpart(intery) * c 
+    intery = intery + gradient
+  end do 
+else
+  do x = xpxl1+1, xpxl2-1 
+    im( x, ipart(intery)) = im( x, ipart(intery)) + rfpart(intery) * c 
+    im( x, ipart(intery)+1) = im( x, ipart(intery)+1) + fpart(intery) * c 
+    intery = intery + gradient
+  end do 
+end if 
+
+end subroutine DrawLine
+
+subroutine swap(x,y) 
+
+  real(kind=dbl), INTENT(INOUT)  :: x, y 
+  real(kind=dbl)                 :: tmp 
+
+  tmp = x
+  x = y 
+  y = tmp
+
+end subroutine swap
+
+function ipart(x) result(r)
+
+  real(kind=dbl), INTENT(IN) :: x 
+  integer(kind=irg)          :: r 
+
+  r = floor(x)
+
+end function ipart
+
+function round(x) result(r)
+
+  real(kind=dbl), INTENT(IN) :: x 
+  integer(kind=irg)          :: r 
+
+  r = ipart(x+0.5D0)
+
+end function round
+
+function fpart(x) result(r)
+
+  real(kind=dbl), INTENT(IN) :: x 
+  real(kind=dbl)             :: r 
+
+  r = x-floor(x)
+
+end function fpart
+
+function rfpart(x) result(r)
+
+  real(kind=dbl), INTENT(IN) :: x 
+  real(kind=dbl)             :: r 
+
+  r = 1.D0 - fpart(x)
+
+end function rfpart
+
 
 end module

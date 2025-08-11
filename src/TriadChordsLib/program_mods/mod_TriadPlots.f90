@@ -63,7 +63,6 @@ contains
 private 
   procedure, pass(self) :: readNameList_
   procedure, pass(self) :: getNameList_
-  procedure, pass(self) :: makeGrid_
   procedure, pass(self) :: TriadPlots_
   procedure, pass(self) :: setmodality_file_
   procedure, pass(self) :: getmodality_file_
@@ -86,7 +85,6 @@ private
 
   generic, public :: getNameList => getNameList_
   generic, public :: readNameList => readNameList_
-  generic, public :: makeGrid => makeGrid_
   generic, public :: TriadPlots => TriadPlots_
   generic, public :: setmodality_file => setmodality_file_
   generic, public :: getmodality_file => getmodality_file_
@@ -616,7 +614,6 @@ subroutine TriadPlots_(self, progname, progdesc)
 !!
 !! perform the computations
 
-use mod_image
 use mod_io
 use mod_triads
 use ISO_C_BINDING
@@ -631,21 +628,9 @@ character(fnlen), INTENT(INOUT)           :: progdesc
 type(Triad_T)                             :: Triad
 type(IO_T)                                :: Message 
 
-integer(int8),allocatable                 :: colormap(:,:,:), rect(:,:,:)
 integer(kind=irg)                         :: interval_range, scl, demag, xmax, ymax, i, j, il, iu 
-integer(kind=irg)                         :: iDD, cr
-integer(int8)                             :: R(0:255), G(0:255), B(0:255) 
-real(kind=dbl)                            :: f1, delta, fl, fu, fr, xx, mi, ma, io_real(2), crad, cradsq, cx, cy
+real(kind=dbl)                            :: f1, delta, fl, fu, fr, xx, io_real(2)
 real(kind=dbl),allocatable                :: xline(:), yline(:), TT(:,:), DD(:,:), MM(:,:), Grid(:,:), Grid2(:,:)
-character(fnlen)                          :: TIFF_filename 
-
-! declare variables for use in object oriented image module
-integer                                   :: iostat, io_int(2)
-character(len=128)                        :: iomsg
-logical                                   :: isInteger, OPC, PUC
-type(image_t)                             :: im
-integer                                   :: dim2(2), Pm
-integer(c_int32_t)                        :: result
 
 
 call Message%printMessage(' ')
@@ -721,7 +706,7 @@ call Message%printMessage(' ')
 allocate(Grid(0:xmax-1,0:ymax-1), Grid2(0:xmax-1,0:ymax-1))
 Grid  = 1.D0
 Grid2 = 1.D0
-call self%makeGrid_(xmax, ymax, Grid2, scl, interval_range)
+call Triad%makeGrid(xmax, ymax, Grid2, scl, interval_range, 'single')
 
 ! binarize the Grid to 1 and 0  and flip it vertically 
 do i=0,xmax-1
@@ -744,437 +729,17 @@ deallocate( Grid2 )
 ! close(dataunit,status='keep')
 
 ! next we generate color tif or bmp files ... 
-allocate( colormap(3, xmax, ymax) )
-
-call Triad%getclrs(R,G,B)
-
-! this is a test image to make sure the color table is correctly reproduced
-! it should look identical to color table 33 in IDL 9.0
-
-! allocate( rect(3, 256, 256) )
-
-! do i=1,256
-!   rect(1,i,1:256) = R(i-1)
-!   rect(2,i,1:256) = G(i-1)
-!   rect(3,i,1:256) = B(i-1)
-! end do 
-! TIFF_filename = trim('rect.tiff')
-! im = image_t(rect)
-! im%dims = (/ 3, 256, 256 /)
-! im%samplesPerPixel = 3
-! im%unsigned = .FALSE.
-! if(im%empty()) call Message%printMessage("TriadPlots: failed to convert array to rgb image")
-
-! ! create the file
-! call im%write(trim(TIFF_filename), iostat, iomsg) ! format automatically detected from extension
-! if(0.ne.iostat) then
-!   call Message%printMessage(" Failed to write image to file : "//iomsg)
-! else
-!   call Message%printMessage(' color map written to '//trim(TIFF_filename),"(A)")
-! end if
-
 call Message%printMessage(' Generating color maps and overlapping coordinate grid ')
 call Message%printMessage(' ')
 
-! start with the dissonance map 
-mi = minval(DD)
-ma = maxval(DD) 
-DD = 255.D0 * ((DD-mi)/(ma-mi))
-do i=1,xmax
-  do j=1,ymax
-    iDD = nint(DD(i-1,j-1))
-    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
-  end do 
-end do 
-
-! add the grid
-do i=1,3
-  colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
-end do 
-
-! also, add a white circle to clearly identify the origin of the grid
-cr = 5
-crad = dble(cr)   ! circle radius in pixels
-cradsq = crad**2
-cx = dble(xmax)/2.D0
-cy = dble(ymax)/2.D0
-do i=-cr-1,cr+1
-  do j=-cr-1,cr+1
-    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
-      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
-    end if 
-  end do 
-end do
-
-TIFF_filename = trim(self%nml%dissonance_file)
-! set up the image_t structure
-im = image_t(colormap)
-im%dims = (/ 3, xmax, ymax /)
-im%samplesPerPixel = 3
-im%unsigned = .TRUE.
-if(im%empty()) call Message%printMessage("TriadPlots: failed to convert array to rgb image")
-
-! create the file
-call im%write(trim(TIFF_filename), iostat, iomsg) ! format automatically detected from extension
-if(0.ne.iostat) then
-  call Message%printMessage(" Failed to write image to file : "//iomsg)
-else
-  call Message%printMessage(' dissonance map written to '//trim(TIFF_filename),"(A)")
-end if
-
-! then the tension map 
-mi = minval(TT)
-ma = maxval(TT) 
-TT = 255.D0 * ((TT-mi)/(ma-mi))
-do i=1,xmax
-  do j=1,ymax
-    iDD = nint(TT(i-1,j-1))
-    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
-  end do 
-end do 
-
-do i=1,3
-  colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
-end do 
-
-! also, add a white circle to clearly identify the origin of the grid
-do i=-cr-1,cr+1
-  do j=-cr-1,cr+1
-    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
-      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
-    end if 
-  end do 
-end do
-
-TIFF_filename = trim(self%nml%tension_file)
-
-! set up the image_t structure
-im = image_t(colormap)
-im%dims = (/ 3, xmax, ymax /)
-im%samplesPerPixel = 3
-im%unsigned = .TRUE.
-if(im%empty()) call Message%printMessage("TriadPlots: failed to convert array to rgb image")
-
-! create the file
-call im%write(trim(TIFF_filename), iostat, iomsg) ! format automatically detected from extension
-if(0.ne.iostat) then
-  call Message%printMessage(" Failed to write image to file : "//iomsg)
-else
-  call Message%printMessage(' tension map written to '//trim(TIFF_filename),"(A)")
-end if
-
-! and the moadlity map 
-mi = minval(MM) 
-ma = maxval(MM) 
-MM = 255.D0 * ((MM-mi)/(ma-mi))
-do i=1,xmax
-  do j=1,ymax
-    iDD = nint(MM(i-1,j-1))
-    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
-  end do 
-end do 
-
-do i=1,3
-  colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
-end do 
-
-! also, add a white circle to clearly identify the origin of the grid
-do i=-cr-1,cr+1
-  do j=-cr-1,cr+1
-    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
-      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
-    end if 
-  end do 
-end do
-
-TIFF_filename = trim(self%nml%modality_file)
-
-! set up the image_t structure
-im = image_t(colormap)
-im%dims = (/ 3, xmax, ymax /)
-im%samplesPerPixel = 3
-if(im%empty()) call Message%printMessage("TriadPlots: failed to convert array to rgb image")
-
-! create the file
-call im%write(trim(TIFF_filename), iostat, iomsg) ! format automatically detected from extension
-if(0.ne.iostat) then
-  call Message%printMessage(" Failed to write image to file : "//iomsg)
-else
-  call Message%printMessage(' modality map written to '//trim(TIFF_filename),"(A)")
-end if
-
-! and finally the instability map 
+call Triad%saveColorMap( xmax, ymax, DD, Grid, self%nml%dissonance_file )
+call Triad%saveColorMap( xmax, ymax, TT, Grid, self%nml%tension_file )
+call Triad%saveColorMap( xmax, ymax, MM, Grid, self%nml%modality_file )
 DD = DD + self%nml%delta * TT
-mi = minval(DD)
-ma = maxval(DD) 
-DD = 255.D0 * ((DD-mi)/(ma-mi))
-do i=1,xmax
-  do j=1,ymax
-    iDD = nint(DD(i-1,j-1))
-    colormap(1:3,i,j) = (/ R(iDD), G(iDD), B(iDD) /)
-  end do 
-end do 
+call Triad%saveColorMap( xmax, ymax, DD, Grid, self%nml%instability_file )
 
-! add the grid
-do i=1,3
-  colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(0:xmax-1,0:ymax-1)
-end do 
-
-! also, add a white circle to clearly identify the origin of the grid
-cr = 5
-crad = dble(cr)   ! circle radius in pixels
-cradsq = crad**2
-cx = dble(xmax)/2.D0
-cy = dble(ymax)/2.D0
-do i=-cr-1,cr+1
-  do j=-cr-1,cr+1
-    if ( (dble(i)**2 + dble(j)**2) .le. cradsq ) then 
-      colormap(1:3,xmax/2+i, ymax/2+j) = -1_int8
-    end if 
-  end do 
-end do
-
-TIFF_filename = trim(self%nml%instability_file)
-! set up the image_t structure
-im = image_t(colormap)
-im%dims = (/ 3, xmax, ymax /)
-im%samplesPerPixel = 3
-im%unsigned = .TRUE.
-if(im%empty()) call Message%printMessage("TriadPlots: failed to convert array to rgb image")
-
-! create the file
-call im%write(trim(TIFF_filename), iostat, iomsg) ! format automatically detected from extension
-if(0.ne.iostat) then
-  call Message%printMessage(" Failed to write image to file : "//iomsg)
-else
-  call Message%printMessage(' instability map written to '//trim(TIFF_filename),"(A)")
-end if
-
-
-deallocate( TT, MM, DD, Grid, colormap, xline, yline )
-
+deallocate( TT, MM, DD, Grid )
 
 end subroutine TriadPlots_
-
-!--------------------------------------------------------------------------
-subroutine makeGrid_(self, xmax, ymax, im, scl, range)
-!DEC$ ATTRIBUTES DLLEXPORT :: TriadPlots_
-!! author: MDG 
-!! version: 1.0 
-!! date: 08/07/25
-!!
-!! add a hexagonal grid to an image 
-
-IMPLICIT NONE 
-
-class(TriadPlots_T), INTENT(INOUT)        :: self
-integer(kind=irg), INTENT(IN)             :: xmax
-integer(kind=irg), INTENT(IN)             :: ymax
-real(kind=dbl), INTENT(INOUT)             :: im(xmax, ymax)
-integer(kind=irg),INTENT(IN)              :: scl
-integer(kind=irg),INTENT(IN)              :: range
-
-real(kind=dbl)                            :: ff, x0, x1, y0, y1, c
-integer(kind=irg)                         :: i, j
-
-ff = sin(cPi/3.D0)/2.D0 
-c = -1.0D0
-
-do i=0,2*range 
-  if (i.le.range) then 
-    x0 = dble(i*scl)/4.D0
-    x1 = dble(i*scl)/2.D0 + dble(xmax-1)/4.D0
-    y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*scl)*ff, 0.D0 /) )
-    y1 = dble(ymax-1)
-  else
-    x0 = dble(range*scl)/4.D0 + dble((i-range)*scl)/2.D0
-    x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range)*scl)/4.D0
-    y0 = 0.D0
-    y1 = dble(ymax-1)-dble((i-range)*scl)*ff
-  end if 
-  call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
-end do  
-
-do i=1,range 
-  x0 = dble(xmax-1)/4.D0-dble(i*scl)/4.D0
-  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*scl)/4.D0, dble(xmax-1) /) )
-  y0 = dble(i*scl)*ff
-  y1 = y0
-  call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
-end do  
-
-do i=1,range-1 
-  x0 = dble(xmax-1)/4.D0-dble(i*scl)/4.D0
-  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*scl)/4.D0, dble(xmax-1) /) )
-  y0 = dble(ymax-1)-dble(i*scl)*ff
-  y1 = y0
-  call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
-end do  
-
-! and complete the perimeter of the hexagon
-x0 = 0.D0 
-y0 = dble(ymax/2) 
-x1 = dble(xmax)/4.D0 
-y1 = 0.D0
-call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
-
-x0 = 3.D0*dble(xmax)/4.D0
-y0 = dble(ymax) 
-x1 = dble(xmax)
-y1 = dble(ymax)/2.D0
-call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
-
-! finally, make the four triangular corners the background color 
-do j=0,ymax/2
-  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), j) = 0.D0
-  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, j) = 0.D0
-  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), ymax-1-j) = 0.D0
-  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, ymax-1-j) = 0.D0
-end do
-
-end subroutine makeGrid_
-
-!--------------------------------------------------------------------------
-!
-! FUNCTION:DrawLine
-!
-!> @author Marc De Graef, Carnegie Mellon University
-!
-!> @brief use Xiaolin Wu's anti-aliasing algorithm to draw a line on an image array
-!
-!> @param im image on which to draw lines
-!> @param nx x-dimension 
-!> @param ny y-dimension
-!> @param xy0 first end point 
-!> @param xy1 second end point 
-!> @param c intensity value
-!
-!> @date 02/07/20  MDG 1.0 original
-!--------------------------------------------------------------------------
-recursive subroutine DrawLine(im, nx, ny, x0, y0, x1, y1, c)
-
-IMPLICIT NONE 
-
-integer(kind=irg), INTENT(IN)   :: nx 
-integer(kind=irg), INTENT(IN)   :: ny 
-real(kind=dbl), INTENT(INOUT)   :: im(0:nx-1,0:ny-1)
-real(kind=dbl), INTENT(INOUT)   :: x0, y0, x1, y1
-real(kind=dbl), INTENT(IN)      :: c 
-  
-real(kind=dbl)                  :: dx, dy, gradient, xend, yend, xgap,  intery, tmp
-integer(kind=irg)               :: xpxl1, ypxl1, xpxl2, ypxl2, x
-logical                         :: steep 
-
-! rearrange the coordinates if necessary
-steep = .FALSE.
-if (abs(y1-y0) .gt. abs(x1-x0)) then 
-  call swap(x0, y0)
-  call swap(x1, y1)
-  steep = .TRUE.
-end if
-
-if (x0 .gt. x1) then 
-  call swap(x0, x1)
-  call swap(y0, y1)
-end if 
-
-dx = x1-x0
-dy = y1-y0
-if (dx.eq.0.D0) then 
-  gradient = 1.D0
-else
-  gradient = dy/dx 
-end if
-
-xend = round(x0)
-yend = y0 + gradient*(xend-x0)
-xgap = rfpart(x0+0.5D0)
-xpxl1 = xend 
-ypxl1 = ipart(yend)
-if (steep.eqv..TRUE.) then 
-  im(ypxl1, xpxl1) = im(ypxl1, xpxl1) + rfpart(yend) * xgap * c 
-  im(ypxl1+1, xpxl1) = im(ypxl1+1, xpxl1) + fpart(yend) * xgap * c 
-else
-  im(xpxl1, ypxl1) = im(xpxl1, ypxl1) + rfpart(yend) * xgap * c 
-  im(xpxl1, ypxl1+1) = im(xpxl1, ypxl1+1) + fpart(yend) * xgap * c 
-end if 
-intery = yend + gradient
-
-xend = round(x1)
-yend = y1 + gradient*(xend-x1)
-xgap = fpart(x1+0.5D0)
-xpxl2 = xend 
-ypxl2 = ipart(yend)
-if (steep.eqv..TRUE.) then 
-  im(ypxl2, xpxl2) = im(ypxl2, xpxl2) + rfpart(yend) * xgap * c 
-  im(ypxl2+1, xpxl2) = im(ypxl2+1, xpxl2) + fpart(yend) * xgap * c 
-else
-  im(xpxl2, ypxl2) = im(xpxl2, ypxl2) + rfpart(yend) * xgap * c 
-  im(xpxl2, ypxl2+1) = im(xpxl2, ypxl2+1) + fpart(yend) * xgap * c 
-end if 
-
-if (steep.eqv..TRUE.) then 
-  do x = xpxl1+1, xpxl2-1 
-    im( ipart(intery), x) = im( ipart(intery), x) + rfpart(intery) * c 
-    im( ipart(intery)+1, x) = im( ipart(intery)+1, x) + fpart(intery) * c 
-    intery = intery + gradient
-  end do 
-else
-  do x = xpxl1+1, xpxl2-1 
-    im( x, ipart(intery)) = im( x, ipart(intery)) + rfpart(intery) * c 
-    im( x, ipart(intery)+1) = im( x, ipart(intery)+1) + fpart(intery) * c 
-    intery = intery + gradient
-  end do 
-end if 
-
-end subroutine DrawLine
-
-subroutine swap(x,y) 
-
-  real(kind=dbl), INTENT(INOUT)  :: x, y 
-  real(kind=dbl)                 :: tmp 
-
-  tmp = x
-  x = y 
-  y = tmp
-
-end subroutine swap
-
-function ipart(x) result(r)
-
-  real(kind=dbl), INTENT(IN) :: x 
-  integer(kind=irg)          :: r 
-
-  r = floor(x)
-
-end function ipart
-
-function round(x) result(r)
-
-  real(kind=dbl), INTENT(IN) :: x 
-  integer(kind=irg)          :: r 
-
-  r = ipart(x+0.5D0)
-
-end function round
-
-function fpart(x) result(r)
-
-  real(kind=dbl), INTENT(IN) :: x 
-  real(kind=dbl)             :: r 
-
-  r = x-floor(x)
-
-end function fpart
-
-function rfpart(x) result(r)
-
-  real(kind=dbl), INTENT(IN) :: x 
-  real(kind=dbl)             :: r 
-
-  r = 1.D0 - fpart(x)
-
-end function rfpart
-
 
 end module mod_TriadPlots

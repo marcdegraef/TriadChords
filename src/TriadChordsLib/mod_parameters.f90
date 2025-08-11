@@ -42,7 +42,7 @@ type fit_parameters
   real(kind=dbl)            :: b2 = 1.6D0                        ! used for dissonance computation
   real(kind=dbl)            :: b3 = 4.0D0                        ! used for dissonance computation
   real(kind=dbl)            :: gam = 1.25D0                      ! used for dissonance computation
-  real(kind=dbl)            :: eps = 1.28402543D0                ! used for modality computation
+  real(kind=dbl)            :: eps = 1.28402543D0                ! used for modality computation (2/1.558)
   real(kind=dbl)            :: delta = 0.207D0                   ! weight factor for instability
   real(kind=dbl)            :: freq2int = 39.8631D0              ! conversion parameter from frequency to interval
 end type fit_parameters

@@ -41,8 +41,11 @@ type, public :: TriadProgressionNameListType
   integer(kind=irg)             :: triad1(3)
   integer(kind=irg)             :: triad2(3)
   integer(kind=irg)             :: triad3(3)
-  integer(kind=irg)             :: numint
-  real(kind=dbl)                :: stepint
+  integer(kind=irg)             :: scale
+  integer(kind=irg)             :: interval_range
+  integer(kind=irg)             :: demag
+  character(fnlen)              :: dissonance_file
+  character(fnlen)              :: tension_file
   character(fnlen)              :: outname
 end type TriadProgressionNameListType
 
@@ -152,18 +155,28 @@ type(IO_T)                                      :: Message
 integer(kind=irg) :: triad1(3)
 integer(kind=irg) :: triad2(3)
 integer(kind=irg) :: triad3(3)
-integer(kind=irg) :: numint
-real(kind=dbl)    :: stepint
+integer(kind=irg) :: scale
+integer(kind=irg) :: interval_range
+integer(kind=irg) :: demag
 character(fnlen)  :: outname
+character(fnlen)  :: dissonance_file
+character(fnlen)  :: tension_file
 
-namelist /TriadProgression/ triad1, triad2, triad3, numint, outname, stepint
+namelist /TriadProgression/ triad1, triad2, triad3, scale, interval_range, demag, outname, dissonance_file, tension_file
 
 triad1 = (/ 0, 4, 7 /)
 triad2 = (/ 0, 3, 7 /)
 triad3 = (/ 0, 4, 7 /)
-numint = 24
-stepint = 0.1D0
+! number of pixels per interval
+scale = 40
+! range of plot along horizontal axis (in units of intervals)
+interval_range = 24
+! coordinate demag factor (if interval_range=24, then actual coordinate range
+! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
+demag = 2
 outname = 'undefined'
+dissonance_file = 'undefined'
+tension_file = 'undefined'
 
 ! read the name list from the config file
 open(UNIT=dataunit,FILE=trim(nmlfile),DELIM='apostrophe',STATUS='old')
@@ -178,9 +191,12 @@ end if
 self%nml%triad1 = triad1
 self%nml%triad2 = triad2
 self%nml%triad3 = triad3
-self%nml%numint = numint
-self%nml%stepint = stepint
+self%nml%scale = scale
+self%nml%interval_range = interval_range
+self%nml%demag = demag
 self%nml%outname = trim(outname)
+self%nml%dissonance_file = trim(dissonance_file)
+self%nml%tension_file = trim(tension_file)
 
 end subroutine readNameList_
 
@@ -226,23 +242,11 @@ character(fnlen), INTENT(INOUT)                 :: progdesc
 type(Triad_T)                                   :: TT
 type(IO_T)                                      :: Message
 
-integer(kind=sgl)                               :: i,j,k,l,iv11,iv12,iv21,iv22,iv31,iv32,dims,istat 
-real(kind=dbl)                                  :: set1(3), set2(3), set3(3), fr2(3), fr3(3), tt12
-real(kind=dbl)                                  :: tt13, tt23, dd12, dd13, dd23, mm12, mm13, mm23, f1, fr
-real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:), mm(:,:), ran(:)
+integer(kind=sgl)                               :: i,j,k,l,iv11,iv12,iv21,iv22,iv31,iv32,dimx,dimy,numx,numy,istat 
+real(kind=dbl)                                  :: set1(3), set2(3), set3(3), fr2(3), fr3(3), tt12, p1, p2
+real(kind=dbl)                                  :: tt13, tt23, dd12, dd13, dd23, mm12, mm13, mm23, f1, fr, frat
+real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:), mm(:,:), ran(:), Grid(:,:), Grid2(:,:)
 character(len=7)                                :: id
-
-! declare variables for use in object oriented image module
-integer(int8),allocatable                       :: colormap(:,:,:)
-integer                                         :: iostat, io_int(2)
-character(len=128)                              :: iomsg
-logical                                         :: isInteger, OPC, PUC
-type(image_t)                                   :: im
-integer                                         :: dim2(2), Pm
-integer(c_int32_t)                              :: result
-integer(int8)                                   :: R(0:255), G(0:255), B(0:255) 
-character(fnlen)                                :: TIFF_filename 
-  
 
 associate( nml => self%nml )
 
@@ -257,123 +261,158 @@ f1 = TT%getf1()
 fr = 1.D0/TT%fits%freq2int
 
 ! define the simulation parameters and allocate arrays
-dims = int(nml%numint/nml%stepint)+1
-allocate(xx(dims),ran(dims),dd(dims,dims),ttt(dims,dims),mm(dims,dims),stat=istat)
-ran = -dble(nml%numint/2) + nml%stepint * (/ (dble(i), i=0,dims) /)
-xx = f1 * 10.D0**(ran * fr)
+numx = nml%interval_range * nml%scale / 2
+numy = int( numx * sqrt(3.D0)/2.D0 )
+dimx = 2*numx+1
+dimy = 2*numy+1
+allocate(dd(dimx,dimy),ttt(dimx,dimy),mm(dimx,dimy),stat=istat)
 
-write (*,*) ' frequencies : '
-write (*,*) xx 
+write (*,*) 'array dimensions : ', dimx, dimy
 
-write (*,*) 'input frequency sets : '
-write (*,*) xx(dims/2+1)
-set1 = xx( dims/2+1+int(nml%triad1/nml%stepint) )
-set2 = xx( dims/2+1+int(nml%triad2/nml%stepint) )
-set3 = xx( dims/2+1+int(nml%triad3/nml%stepint) )
+! set1 = f1 * 10.D0**(dble(nml%triad1/nml%stepint) * fr )
+! set2 = f1 * 10.D0**(dble(nml%triad2/nml%stepint) * fr )
+! set3 = f1 * 10.D0**(dble(nml%triad3/nml%stepint) * fr )
+
+set1 = dble(nml%triad1)
+set2 = dble(nml%triad2)
+set3 = dble(nml%triad3)
+
 write(*,*) nml%triad1,': ', set1 
 write(*,*) nml%triad2,': ', set2 
 write(*,*) nml%triad3,': ', set3 
 
 ! start major computation loop
-do i=1,dims
-        fr2 = xx(i) + set2
-        tt12 =        TT%totalquantity(set1(1),fr2(1),fr2(2),'T')
-        tt12 = tt12 + TT%totalquantity(set1(1),fr2(1),fr2(3),'T')
-        tt12 = tt12 + TT%totalquantity(set1(1),fr2(2),fr2(3),'T')
-        tt12 = tt12 + TT%totalquantity(set1(2),fr2(1),fr2(2),'T')
-        tt12 = tt12 + TT%totalquantity(set1(2),fr2(1),fr2(3),'T')
-        tt12 = tt12 + TT%totalquantity(set1(2),fr2(2),fr2(3),'T')
-        tt12 = tt12 + TT%totalquantity(set1(3),fr2(1),fr2(2),'T')
-        tt12 = tt12 + TT%totalquantity(set1(3),fr2(1),fr2(3),'T')
-        tt12 = tt12 + TT%totalquantity(set1(3),fr2(2),fr2(3),'T')
-        
-        tt12 = tt12 + TT%totalquantity(fr2(1),set1(1),set1(2),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(1),set1(1),set1(3),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(1),set1(2),set1(3),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(2),set1(1),set1(2),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(2),set1(1),set1(3),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(2),set1(2),set1(3),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(3),set1(1),set1(2),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(3),set1(1),set1(3),'T')
-        tt12 = tt12 + TT%totalquantity(fr2(3),set1(2),set1(3),'T')
-        tt12 = tt12/18.D0
+p1 = dble(nml%demag * nml%interval_range/2)
+p2 = p1/2.D0
 
-        dd12 = 0.D0
+do j=1,dimy
+        fr3 = (p1 * dble(j - (numy+1))/dble(numy)) + set3 ! xx(i) + set2
+        tt13 =        TT%triad_tension(fr3(1),set1(1),set1(2))
+        tt13 = tt13 + TT%triad_tension(fr3(1),set1(1),set1(3))
+        tt13 = tt13 + TT%triad_tension(fr3(1),set1(2),set1(3))
+        tt13 = tt13 + TT%triad_tension(fr3(2),set1(1),set1(2))
+        tt13 = tt13 + TT%triad_tension(fr3(2),set1(1),set1(3))
+        tt13 = tt13 + TT%triad_tension(fr3(2),set1(2),set1(3))
+        tt13 = tt13 + TT%triad_tension(fr3(3),set1(1),set1(2))
+        tt13 = tt13 + TT%triad_tension(fr3(3),set1(1),set1(3))
+        tt13 = tt13 + TT%triad_tension(fr3(3),set1(2),set1(3))
+        
+        tt13 = tt13 + TT%triad_tension(set1(1),fr3(1),fr3(2))
+        tt13 = tt13 + TT%triad_tension(set1(1),fr3(1),fr3(3))
+        tt13 = tt13 + TT%triad_tension(set1(1),fr3(2),fr3(3))
+        tt13 = tt13 + TT%triad_tension(set1(2),fr3(1),fr3(2))
+        tt13 = tt13 + TT%triad_tension(set1(2),fr3(1),fr3(3))
+        tt13 = tt13 + TT%triad_tension(set1(2),fr3(2),fr3(3))
+        tt13 = tt13 + TT%triad_tension(set1(3),fr3(1),fr3(2))
+        tt13 = tt13 + TT%triad_tension(set1(3),fr3(1),fr3(3))
+        tt13 = tt13 + TT%triad_tension(set1(3),fr3(2),fr3(3))
+        tt13 = tt13/18.D0
+
+        dd13 = 0.D0
         do k=1,3
                 do l=1,3
-                        ! dd12 = dd12 + TT%triad_dissonance(dabs(set1(k)-fr2(l)))
-                        dd12 = dd12 + TT%triad_dissonance(set1(k)/fr2(l))
+                        dd13 = dd13 + TT%triad_dissonance(dabs(fr3(k)-set1(l)))
                 end do
         end do
-        dd12 = dd12/9.D0
+        dd13 = dd13/9.D0
 
-        do j=1,dims
-                fr3 = xx(j) + set3
-                tt23 =        TT%totalquantity(fr2(1),fr3(1),fr3(2),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(1),fr3(1),fr3(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(1),fr3(2),fr3(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(2),fr3(1),fr3(2),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(2),fr3(1),fr3(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(2),fr3(2),fr3(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(3),fr3(1),fr3(2),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(3),fr3(1),fr3(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr2(3),fr3(2),fr3(3),'T')
-                
-                tt23 = tt23 + TT%totalquantity(fr3(1),fr2(1),fr2(2),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(1),fr2(1),fr2(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(1),fr2(2),fr2(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(2),fr2(1),fr2(2),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(2),fr2(1),fr2(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(2),fr2(2),fr2(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(3),fr2(1),fr2(2),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(3),fr2(1),fr2(3),'T')
-                tt23 = tt23 + TT%totalquantity(fr3(3),fr2(2),fr2(3),'T')
-                tt23 = tt23/18.D0
+        do i=1,dimx
 
-                dd23 = 0.D0
-                do k=1,3
-                        do l=1,3
-                                ! dd23 = dd23 + TT%triad_dissonance(dabs(fr2(k)-fr3(l)))
-                                dd23 = dd23 + TT%triad_dissonance(fr2(k)/fr3(l))
-                        end do
-                end do
-                dd23 = dd23/9.D0
+          fr2 = p1 * dble(i - (numx+1))/dble(numx) + p2 * dble(j - (numy+1))/dble(numy) + set2
+          tt23 =        TT%triad_tension(fr2(1),fr3(1),fr3(2))
+          tt23 = tt23 + TT%triad_tension(fr2(1),fr3(1),fr3(3))
+          tt23 = tt23 + TT%triad_tension(fr2(1),fr3(2),fr3(3))
+          tt23 = tt23 + TT%triad_tension(fr2(2),fr3(1),fr3(2))
+          tt23 = tt23 + TT%triad_tension(fr2(2),fr3(1),fr3(3))
+          tt23 = tt23 + TT%triad_tension(fr2(2),fr3(2),fr3(3))
+          tt23 = tt23 + TT%triad_tension(fr2(3),fr3(1),fr3(2))
+          tt23 = tt23 + TT%triad_tension(fr2(3),fr3(1),fr3(3))
+          tt23 = tt23 + TT%triad_tension(fr2(3),fr3(2),fr3(3))
+          
+          tt23 = tt23 + TT%triad_tension(fr3(1),fr2(1),fr2(2))
+          tt23 = tt23 + TT%triad_tension(fr3(1),fr2(1),fr2(3))
+          tt23 = tt23 + TT%triad_tension(fr3(1),fr2(2),fr2(3))
+          tt23 = tt23 + TT%triad_tension(fr3(2),fr2(1),fr2(2))
+          tt23 = tt23 + TT%triad_tension(fr3(2),fr2(1),fr2(3))
+          tt23 = tt23 + TT%triad_tension(fr3(2),fr2(2),fr2(3))
+          tt23 = tt23 + TT%triad_tension(fr3(3),fr2(1),fr2(2))
+          tt23 = tt23 + TT%triad_tension(fr3(3),fr2(1),fr2(3))
+          tt23 = tt23 + TT%triad_tension(fr3(3),fr2(2),fr2(3))
+          tt23 = tt23/18.D0
 
-                tt13 =        TT%totalquantity(fr3(1),set1(1),set1(2),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(1),set1(1),set1(3),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(1),set1(2),set1(3),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(2),set1(1),set1(2),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(2),set1(1),set1(3),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(2),set1(2),set1(3),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(3),set1(1),set1(2),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(3),set1(1),set1(3),'T')
-                tt13 = tt13 + TT%totalquantity(fr3(3),set1(2),set1(3),'T')
-                
-                tt13 = tt13 + TT%totalquantity(set1(1),fr3(1),fr3(2),'T')
-                tt13 = tt13 + TT%totalquantity(set1(1),fr3(1),fr3(3),'T')
-                tt13 = tt13 + TT%totalquantity(set1(1),fr3(2),fr3(3),'T')
-                tt13 = tt13 + TT%totalquantity(set1(2),fr3(1),fr3(2),'T')
-                tt13 = tt13 + TT%totalquantity(set1(2),fr3(1),fr3(3),'T')
-                tt13 = tt13 + TT%totalquantity(set1(2),fr3(2),fr3(3),'T')
-                tt13 = tt13 + TT%totalquantity(set1(3),fr3(1),fr3(2),'T')
-                tt13 = tt13 + TT%totalquantity(set1(3),fr3(1),fr3(3),'T')
-                tt13 = tt13 + TT%totalquantity(set1(3),fr3(2),fr3(3),'T')
-                tt13 = tt13/18.D0
-        
-                dd13 = 0.D0
-                do k=1,3
-                        do l=1,3
-                                dd13 = dd13 + TT%triad_dissonance(fr3(k)/set1(l))
-                        end do
-                end do
-                dd13 = dd13/9.D0
+          dd23 = 0.D0
+          do k=1,3
+                  do l=1,3
+                          dd23 = dd23 + TT%triad_dissonance(dabs(fr2(k)-fr3(l)))
+                  end do
+          end do
+          dd23 = dd23/9.D0
 
-                dd(i,j) = dd12+dd23+dd13
-                ttt(i,j) = tt12+tt23+tt13
+          tt12 =        TT%triad_tension(set1(1),fr2(1),fr2(2))
+          tt12 = tt12 + TT%triad_tension(set1(1),fr2(1),fr2(3))
+          tt12 = tt12 + TT%triad_tension(set1(1),fr2(2),fr2(3))
+          tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(2))
+          tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(3))
+          tt12 = tt12 + TT%triad_tension(set1(2),fr2(2),fr2(3))
+          tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(2))
+          tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(3))
+          tt12 = tt12 + TT%triad_tension(set1(3),fr2(2),fr2(3))
+          
+          tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(2))
+          tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(3))
+          tt12 = tt12 + TT%triad_tension(fr2(1),set1(2),set1(3))
+          tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(2))
+          tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(3))
+          tt12 = tt12 + TT%triad_tension(fr2(2),set1(2),set1(3))
+          tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(2))
+          tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(3))
+          tt12 = tt12 + TT%triad_tension(fr2(3),set1(2),set1(3))
+          tt12 = tt12/18.D0
+
+          dd12 = 0.D0
+          do k=1,3
+                  do l=1,3
+                          dd12 = dd12 + TT%triad_dissonance(dabs(set1(k)-fr2(l)))
+                  end do
+          end do
+          dd12 = dd12/9.D0
+
+          dd(i,j)  = dd12+dd23+dd13
+          ttt(i,j) = tt12+tt23+tt13
         end do
 end do
 
-! and save the resulting arrays in a file that can be read by IDL
+! to do:
+!   - background subtraction 
+!   - color tiff output 
+
+! some corrections due to a likely bug ... they won't matter in the end...
+dd(1,1) = dd(2,1) 
+ttt(1:3,1) = ttt(4,1) 
+
+allocate(Grid(dimx,dimy), Grid2(0:dimx-1,0:dimy-1))
+Grid  = 1.D0
+Grid2 = 1.D0
+call TT%makeGrid(dimx, dimy, Grid2, nml%scale, nml%interval_range, 'triad')
+
+! binarize the Grid to 1 and 0 
+do i=1,dimx
+  do j=1,dimy
+    if (Grid2(i-1,j-1).gt.0.5D0) then 
+      Grid(i,j) = 1.D0
+    else
+      Grid(i,j) = 0.D0 
+    end if
+  end do 
+end do 
+
+deallocate( Grid2 )
+
+call TT%saveColorMap( dimx, dimy, dd, Grid, nml%dissonance_file )
+call TT%saveColorMap( dimx, dimy, ttt, Grid, nml%tension_file )
+
+
+! for now save the resulting arrays in a file that can be read by IDL for debugging purposes
 open(unit=dataunit,file=trim(self%nml%outname),status='unknown',action='write',form='unformatted')
 write (dataunit) real(dd)
 write (dataunit) real(ttt)
