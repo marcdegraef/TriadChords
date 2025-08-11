@@ -401,7 +401,7 @@ do j=1,dimy
         end do
       if (mod(j,50).eq.0) then 
         io_int = (/ j, dimy /)
-        call Message%WriteValue(' completed ',io_int, 2, frm="(I4,' of ',I4,' lines')")
+        call Message%WriteValue(' completed ',io_int, 2, frm="(I5,' of ',I5,' lines')")
       end if
 end do
 !$OMP END DO
