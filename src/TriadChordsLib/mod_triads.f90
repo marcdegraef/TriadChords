@@ -1044,7 +1044,7 @@ call Message%WriteValue(' Modality    : ', io_real, 3, frm="(3(F8.3,' '))")
 end subroutine triad_
 
 !--------------------------------------------------------------------------
-subroutine makeGrid_(self, xmax, ymax, im, scl, range)
+subroutine makeGrid_(self, xmax, ymax, im, scl, range, bg)
 !DEC$ ATTRIBUTES DLLEXPORT :: makeGrid_
 !! author: MDG 
 !! version: 1.0 
@@ -1060,8 +1060,9 @@ integer(kind=irg), INTENT(IN)             :: ymax
 real(kind=dbl), INTENT(INOUT)             :: im(xmax, ymax)
 integer(kind=irg),INTENT(IN)              :: scl
 integer(kind=irg),INTENT(IN)              :: range
+character(1),INTENT(IN)                   :: bg
 
-real(kind=dbl)                            :: ff, x0, x1, y0, y1, c
+real(kind=dbl)                            :: ff, x0, x1, y0, y1, c, bgcolor
 integer(kind=irg)                         :: i, j
 
 ff = sin(cPi/3.D0)/2.D0 
@@ -1113,11 +1114,13 @@ y1 = dble(ymax)/2.D0
 call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
 
 ! finally, make the four triangular corners the background color 
+bgcolor = 0.D0
+if (bg.eq.'w') bgcolor = -100.D0 
 do j=0,ymax/2
-  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), j) = 0.D0
-  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, j) = 0.D0
-  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), ymax-1-j) = 0.D0
-  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, ymax-1-j) = 0.D0
+  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), j) = bgcolor
+  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, j) = bgcolor
+  im( 0:int(dble(xmax-1)/4.D0 - dble(j)*(dble(xmax)/dble(2*ymax)) ), ymax-1-j) = bgcolor
+  im( int(3.D0*dble(xmax-1)/4.D0 + dble(j)*(dble(xmax)/dble(2*ymax)) ):xmax-1, ymax-1-j) = bgcolor
 end do
 
 end subroutine makeGrid_
@@ -1150,7 +1153,7 @@ type(IO_T)                                :: Message
 
 character(fnlen)                          :: TIFF_filename 
 integer(int8),allocatable                 :: colormap(:,:,:)
-integer(kind=irg)                         :: iDD, cr, i, j
+integer(kind=irg)                         :: iDD, cr, i, j, k
 integer(int8)                             :: R(0:255), G(0:255), B(0:255) 
 real(kind=dbl)                            :: mi, ma, crad, cradsq, cx, cy
 
@@ -1178,8 +1181,16 @@ do i=1,xmax
 end do 
 
 ! add the grid
-do i=1,3
-  colormap(i,1:xmax,1:ymax) = colormap(i,1:xmax,1:ymax) * Grid(1:xmax,1:ymax)
+do j=1,xmax
+  do k=1,ymax
+    if (Grid(j,k).eq.-100.D0) then 
+      colormap(1:3,j,k) = -1_int8
+    else
+      do i=1,3
+        colormap(i,j,k) = colormap(i,j,k) * Grid(j,k)
+      end do 
+    end if 
+  end do 
 end do 
 
 ! also, add a white circle to clearly identify the origin of the grid

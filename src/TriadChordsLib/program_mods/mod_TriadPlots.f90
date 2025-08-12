@@ -631,6 +631,7 @@ type(IO_T)                                :: Message
 integer(kind=irg)                         :: interval_range, scl, demag, xmax, ymax, i, j, il, iu 
 real(kind=dbl)                            :: f1, delta, fl, fu, fr, xx, io_real(2)
 real(kind=dbl),allocatable                :: xline(:), yline(:), TT(:,:), DD(:,:), MM(:,:), Grid(:,:), Grid2(:,:)
+character(1)                              :: bg
 
 
 call Message%printMessage(' ')
@@ -706,15 +707,20 @@ call Message%printMessage(' ')
 allocate(Grid(0:xmax-1,0:ymax-1), Grid2(0:xmax-1,0:ymax-1))
 Grid  = 1.D0
 Grid2 = 1.D0
-call Triad%makeGrid(xmax, ymax, Grid2, scl, interval_range)
+bg = 'w'
+call Triad%makeGrid(xmax, ymax, Grid2, scl, interval_range, bg)
 
 ! binarize the Grid to 1 and 0  and flip it vertically 
 do i=0,xmax-1
   do j=0,ymax-1
-    if (Grid2(i,j).gt.0.5D0) then 
-      Grid(i,ymax-1-j) = 1.D0
+    if (Grid2(i,j).eq.-100.D0) then 
+      Grid(i,ymax-1-j) = -100.D0
     else
-      Grid(i,ymax-1-j) = 0.D0 
+      if (Grid2(i,j).gt.0.5D0) then 
+        Grid(i,ymax-1-j) = 1.D0
+      else
+        Grid(i,ymax-1-j) = 0.D0 
+      end if
     end if
   end do 
 end do 

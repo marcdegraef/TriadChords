@@ -12,6 +12,10 @@
 ! coordinate demag factor (if interval_range=24, then actual coordinate range
 ! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
  demag = 2,
+! back ground color outside of hexagon ('b'=black, 'w'=white)
+ bg = 'w',
+! perform background subtraction with 3rd order polynomial fit ? ('y', 'n')
+ bgsubtract = 'y',
 ! output file name
  outname = 'undefined',
  /

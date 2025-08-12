@@ -44,6 +44,8 @@ type, public :: TriadProgressionNameListType
   integer(kind=irg)             :: scale
   integer(kind=irg)             :: interval_range
   integer(kind=irg)             :: demag
+  character(1)                  :: bg
+  character(1)                  :: bgsubtract
   character(fnlen)              :: dissonance_file
   character(fnlen)              :: tension_file
   character(fnlen)              :: outname
@@ -158,11 +160,14 @@ integer(kind=irg) :: triad3(3)
 integer(kind=irg) :: scale
 integer(kind=irg) :: interval_range
 integer(kind=irg) :: demag
+character(1)      :: bg
+character(1)      :: bgsubtract
 character(fnlen)  :: outname
 character(fnlen)  :: dissonance_file
 character(fnlen)  :: tension_file
 
-namelist /TriadProgression/ triad1, triad2, triad3, scale, interval_range, demag, outname, dissonance_file, tension_file
+namelist /TriadProgression/ triad1, triad2, triad3, scale, interval_range, demag, outname, dissonance_file,  &
+                            tension_file, bg, bgsubtract
 
 triad1 = (/ 0, 4, 7 /)
 triad2 = (/ 0, 3, 7 /)
@@ -174,6 +179,8 @@ interval_range = 24
 ! coordinate demag factor (if interval_range=24, then actual coordinate range
 ! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
 demag = 2
+bg = 'w'
+bgsubtract = 'y'
 outname = 'undefined'
 dissonance_file = 'undefined'
 tension_file = 'undefined'
@@ -194,6 +201,8 @@ self%nml%triad3 = triad3
 self%nml%scale = scale
 self%nml%interval_range = interval_range
 self%nml%demag = demag
+self%nml%bg = bg
+self%nml%bgsubtract = bgsubtract
 self%nml%outname = trim(outname)
 self%nml%dissonance_file = trim(dissonance_file)
 self%nml%tension_file = trim(tension_file)
@@ -230,6 +239,7 @@ subroutine TriadProgression_(self, progname, progdesc)
 use mod_io 
 use mod_triads
 use mod_image
+use mod_math
 use omp_lib
 use ISO_C_BINDING
 use, intrinsic :: iso_fortran_env
@@ -247,7 +257,8 @@ integer(kind=sgl)                               :: i,j,k,l,iv11,iv12,iv21,iv22,i
                                                    TID, io_int(2) 
 real(kind=dbl)                                  :: set1(3), set2(3), set3(3), fr2(3), fr3(3), tt12, p1, p2
 real(kind=dbl)                                  :: tt13, tt23, dd12, dd13, dd23, mm12, mm13, mm23, f1, fr, frat
-real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:), mm(:,:), ran(:), Grid(:,:), Grid2(:,:)
+real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:), mm(:,:), ran(:), Grid(:,:), Grid2(:,:), &
+                                                   background(:,:)
 character(len=7)                                :: id
 
 associate( nml => self%nml )
@@ -418,20 +429,33 @@ ttt(1:3,1) = ttt(4,1)
 allocate(Grid(dimx,dimy), Grid2(0:dimx-1,0:dimy-1))
 Grid  = 1.D0
 Grid2 = 1.D0
-call TT%makeGrid(dimx, dimy, Grid2, nml%scale, nml%interval_range)
+call TT%makeGrid(dimx, dimy, Grid2, nml%scale, nml%interval_range, nml%bg)
 
 ! binarize the Grid to 1 and 0 
 do i=1,dimx
   do j=1,dimy
-    if (Grid2(i-1,j-1).gt.0.5D0) then 
-      Grid(i,j) = 1.D0
+    if (Grid2(i-1,j-1).eq.-100.D0) then 
+      Grid(i,j) = -100.D0
     else
-      Grid(i,j) = 0.D0 
-    end if
+      if (Grid2(i-1,j-1).gt.0.5D0) then 
+        Grid(i,j) = 1.D0
+      else
+        Grid(i,j) = 0.D0 
+      end if
+    end if 
   end do 
 end do 
 
 deallocate( Grid2 )
+
+if (nml%bgsubtract.eq.'y') then 
+  allocate( background(dimx, dimy) )
+  background = sfit(dimx, dimy, dd, 3)
+  dd = dd - background
+  background = sfit(dimx, dimy, ttt, 3)
+  ttt = ttt - background
+  deallocate( background )
+end if 
 
 call TT%saveColorMap( dimx, dimy, dd, Grid, nml%dissonance_file )
 call TT%saveColorMap( dimx, dimy, ttt, Grid, nml%tension_file )
