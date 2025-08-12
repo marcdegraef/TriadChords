@@ -17,6 +17,8 @@ set(TriadLib_SRCS
   ${TriadLib_SOURCE_DIR}/mod_image.f90
   ${TriadLib_SOURCE_DIR}/mod_image_io.f90
   ${TriadLib_SOURCE_DIR}/mod_math.f90
+  ${TriadLib_SOURCE_DIR}/mod_postscript.f90
+  ${TriadLib_SOURCE_DIR}/mod_axis.f90
 
   ${TriadLib_SOURCE_DIR}/program_mods/mod_TriadProgression.f90
   ${TriadLib_SOURCE_DIR}/program_mods/mod_TriadPlots.f90
