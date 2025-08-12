@@ -1063,39 +1063,41 @@ integer(kind=irg),INTENT(IN)              :: range
 character(1),INTENT(IN)                   :: bg
 
 real(kind=dbl)                            :: ff, x0, x1, y0, y1, c, bgcolor
-integer(kind=irg)                         :: i, j
+integer(kind=irg)                         :: i, j, localscl
 
 ff = sin(cPi/3.D0)/2.D0 
 c = -1.0D0
 
+localscl = scl*2 
+
 ! horizontal grid lines
-do i=1,range 
-  x0 = dble(xmax-1)/4.D0-dble(i*scl)/4.D0
-  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*scl)/4.D0, dble(xmax-1) /) )
-  y0 = dble(i*scl)*ff
+do i=1,range/2 
+  x0 = dble(xmax-1)/4.D0-dble(i*localscl)/4.D0
+  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*localscl)/4.D0, dble(xmax-1) /) )
+  y0 = dble(i*localscl)*ff
   y1 = y0
   call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
 end do  
 
-do i=1,range-1 
-  x0 = dble(xmax-1)/4.D0-dble(i*scl)/4.D0
-  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*scl)/4.D0, dble(xmax-1) /) )
-  y0 = dble(ymax-1)-dble(i*scl)*ff
+do i=1,range/2-1 
+  x0 = dble(xmax-1)/4.D0-dble(i*localscl)/4.D0
+  x1 = minval( (/ 3.D0*dble(xmax-1)/4.D0+dble(i*localscl)/4.D0, dble(xmax-1) /) )
+  y0 = dble(ymax-1)-dble(i*localscl)*ff
   y1 = y0
   call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
 end do  
 
-do i=0,2*range 
-  if (i.le.range) then 
-    x0 = dble(i*scl)/4.D0
-    x1 = dble(i*scl)/2.D0 + dble(xmax-1)/4.D0
-    y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*scl)*ff, 0.D0 /) )
+do i=0,range 
+  if (i.le.range/2) then 
+    x0 = dble(i*localscl)/4.D0
+    x1 = dble(i*localscl)/2.D0 + dble(xmax-1)/4.D0
+    y0 = maxval( (/ dble(ymax-1)/2.D0-dble(i*localscl)*ff, 0.D0 /) )
     y1 = dble(ymax-1)
   else
-    x0 = dble(range*scl)/4.D0 + dble((i-range)*scl)/2.D0
-    x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range)*scl)/4.D0
+    x0 = dble(range*scl)/4.D0 + dble((i-range/2)*localscl)/2.D0
+    x1 = 3.D0*dble(range*scl)/4.D0 + dble((i-range/2)*localscl)/4.D0
     y0 = 0.D0
-    y1 = dble(ymax-1)-dble((i-range)*scl)*ff
+    y1 = dble(ymax-1)-dble((i-range/2)*localscl)*ff
   end if 
   call DrawLine(im, xmax, ymax, x0, y0, x1, y1, c)
 end do  

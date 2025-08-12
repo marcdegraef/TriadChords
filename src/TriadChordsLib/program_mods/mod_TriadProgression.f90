@@ -43,7 +43,6 @@ type, public :: TriadProgressionNameListType
   integer(kind=irg)             :: triad3(3)
   integer(kind=irg)             :: scale
   integer(kind=irg)             :: interval_range
-  integer(kind=irg)             :: demag
   character(1)                  :: bg
   character(1)                  :: bgsubtract
   character(fnlen)              :: dissonance_file
@@ -159,14 +158,13 @@ integer(kind=irg) :: triad2(3)
 integer(kind=irg) :: triad3(3)
 integer(kind=irg) :: scale
 integer(kind=irg) :: interval_range
-integer(kind=irg) :: demag
 character(1)      :: bg
 character(1)      :: bgsubtract
 character(fnlen)  :: outname
 character(fnlen)  :: dissonance_file
 character(fnlen)  :: tension_file
 
-namelist /TriadProgression/ triad1, triad2, triad3, scale, interval_range, demag, outname, dissonance_file,  &
+namelist /TriadProgression/ triad1, triad2, triad3, scale, interval_range, outname, dissonance_file,  &
                             tension_file, bg, bgsubtract
 
 triad1 = (/ 0, 4, 7 /)
@@ -176,9 +174,6 @@ triad3 = (/ 0, 4, 7 /)
 scale = 40
 ! range of plot along horizontal axis (in units of intervals)
 interval_range = 24
-! coordinate demag factor (if interval_range=24, then actual coordinate range
-! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
-demag = 2
 bg = 'w'
 bgsubtract = 'y'
 outname = 'undefined'
@@ -200,7 +195,6 @@ self%nml%triad2 = triad2
 self%nml%triad3 = triad3
 self%nml%scale = scale
 self%nml%interval_range = interval_range
-self%nml%demag = demag
 self%nml%bg = bg
 self%nml%bgsubtract = bgsubtract
 self%nml%outname = trim(outname)
@@ -295,7 +289,7 @@ write(*,*) nml%triad2,': ', set2
 write(*,*) nml%triad3,': ', set3 
 
 ! start major computation loop
-p1 = dble(nml%demag * nml%interval_range/2)
+p1 = dble(nml%interval_range/2)
 p2 = p1/2.D0
 
 

@@ -13,9 +13,6 @@
  scale = 40,
 ! range of plot along horizontal axis (in units of intervals)
  interval_range = 24,
-! coordinate demag factor (if interval_range=24, then actual coordinate range
-! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
- demag = 2,
 ! fundamental frequency (default A4)
  f1 = 440.D0,
 ! weight factor for tension in the instability calculation 

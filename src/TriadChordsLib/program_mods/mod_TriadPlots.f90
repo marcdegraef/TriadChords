@@ -49,7 +49,6 @@ type, public :: TriadPlotsNameListType
   character(fnlen)    :: data_file
   integer(kind=irg)   :: scale
   integer(kind=irg)   :: interval_range
-  integer(kind=irg)   :: demag
   real(kind=dbl)      :: delta
 end type TriadPlotsNameListType
 
@@ -78,8 +77,6 @@ private
   procedure, pass(self) :: getscale_
   procedure, pass(self) :: setinterval_range_
   procedure, pass(self) :: getinterval_range_
-  procedure, pass(self) :: setdemag_
-  procedure, pass(self) :: getdemag_
   procedure, pass(self) :: setdelta_
   procedure, pass(self) :: getdelta_
 
@@ -100,8 +97,6 @@ private
   generic, public :: getscale => getscale_
   generic, public :: setinterval_range => setinterval_range_
   generic, public :: getinterval_range => getinterval_range_
-  generic, public :: setdemag => setdemag_
-  generic, public :: getdemag => getdemag_
   generic, public :: setdelta => setdelta_
   generic, public :: getdelta => getdelta_
 
@@ -200,11 +195,10 @@ character(fnlen)                      :: instability_file
 character(fnlen)                      :: data_file
 integer(kind=irg)                     :: scale
 integer(kind=irg)                     :: interval_range
-integer(kind=irg)                     :: demag
 real(kind=dbl)                        :: delta
 
 namelist / TriadPlots / modality_file, dissonance_file, tension_file, instability_file, data_file, &
-                        scale, interval_range, demag, delta 
+                        scale, interval_range, delta 
 
 modality_file = 'undefined'
 ! output file for dissonance plot (bmp or tiff)
@@ -219,9 +213,6 @@ data_file = 'undefined'
 scale = 40
 ! range of plot along horizontal axis (in units of intervals)
 interval_range = 24
-! coordinate demag factor (if interval_range=24, then actual coordinate range
-! will be from -12 to +12 if demag=1, -24 to +24 if demag=2 etc.)
-demag = 2
 ! weight factor for tension in the instability calculation 
 delta = 0.2D0
 
@@ -258,7 +249,6 @@ self%nml%instability_file = instability_file
 self%nml%data_file = data_file
 self%nml%scale = scale
 self%nml%interval_range = interval_range
-self%nml%demag = demag
 self%nml%delta = delta
 
 end subroutine readNameList_
@@ -534,42 +524,6 @@ out = self%nml%interval_range
 end function getinterval_range_
 
 !--------------------------------------------------------------------------
-subroutine setdemag_(self,inp)
-!DEC$ ATTRIBUTES DLLEXPORT :: setdemag_
-!! author: MDG
-!! version: 1.0
-!! date: 08/06/25
-!!
-!! set demag in the TriadPlots_T class
-
-IMPLICIT NONE
-
-class(TriadPlots_T), INTENT(INOUT)     :: self
-integer(kind=irg), INTENT(IN)       :: inp
-
-self%nml%demag = inp
-
-end subroutine setdemag_
-
-!--------------------------------------------------------------------------
-function getdemag_(self) result(out)
-!DEC$ ATTRIBUTES DLLEXPORT :: getdemag_
-!! author: MDG
-!! version: 1.0
-!! date: 08/06/25
-!!
-!! get demag from the TriadPlots_T class
-
-IMPLICIT NONE
-
-class(TriadPlots_T), INTENT(INOUT)     :: self
-integer(kind=irg)                   :: out
-
-out = self%nml%demag
-
-end function getdemag_
-
-!--------------------------------------------------------------------------
 subroutine setdelta_(self,inp)
 !DEC$ ATTRIBUTES DLLEXPORT :: setdelta_
 !! author: MDG
@@ -616,6 +570,7 @@ subroutine TriadPlots_(self, progname, progdesc)
 
 use mod_io
 use mod_triads
+use omp_lib
 use ISO_C_BINDING
 use, intrinsic :: iso_fortran_env
 
@@ -625,10 +580,10 @@ class(TriadPlots_T), INTENT(INOUT)        :: self
 character(fnlen), INTENT(INOUT)           :: progname 
 character(fnlen), INTENT(INOUT)           :: progdesc
 
-type(Triad_T)                             :: Triad
+type(Triad_T)                             :: Triad, myTT
 type(IO_T)                                :: Message 
 
-integer(kind=irg)                         :: interval_range, scl, demag, xmax, ymax, i, j, il, iu 
+integer(kind=irg)                         :: interval_range, scl, xmax, ymax, i, j, il, iu, io_int(2), TID 
 real(kind=dbl)                            :: f1, delta, fl, fu, fr, xx, io_real(2)
 real(kind=dbl),allocatable                :: xline(:), yline(:), TT(:,:), DD(:,:), MM(:,:), Grid(:,:), Grid2(:,:)
 character(1)                              :: bg
@@ -642,7 +597,6 @@ call Message%printMessage(' ')
 ! set the local parameters and initialize the coordinate arrays for a hexagonal plot
 interval_range = self%nml%interval_range
 scl = self%nml%scale
-demag = self%nml%demag
 delta = self%nml%delta
 
 xmax = scl * interval_range + 1
@@ -650,9 +604,9 @@ ymax = nint( scl * interval_range * cos(cPi/6.D0)) + 1
 
 allocate( xline(0:xmax-1), yline(0:ymax-1) )
 xline = (/ (dble(i), i=0,xmax-1) /)
-xline = demag * (interval_range * xline/dble(xmax-1)-interval_range/2.0)
+xline = (interval_range * xline/dble(xmax-1)-interval_range/2.0)
 yline = (/ (dble(i), i=0,ymax-1) /)
-yline = demag * (interval_range * yline/dble(ymax-1)-interval_range/2.0)
+yline = (interval_range * yline/dble(ymax-1)-interval_range/2.0)
 
 ! allocate the 2D arrays 
 allocate( TT(0:xmax-1, 0:ymax-1), DD(0:xmax-1, 0:ymax-1), MM(0:xmax-1, 0:ymax-1) )
@@ -669,26 +623,45 @@ call Message%printMessage(' ')
 call Message%printMessage(' Computing Dissonance, Tension, and Modality maps ... ')
 
 ! and compute the entries; this approach uses the frequencies explicitly
+call OMP_SET_NUM_THREADS(OMP_GET_MAX_THREADS())
+io_int(1) = OMP_GET_NUM_THREADS()
+call Message%WriteValue(' -> Number of threads set to ',io_int,1,"(I3)")
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(TID, myTT, il, fl, iu, fu) 
+
+TID = OMP_GET_THREAD_NUM()
+
+! initialize a threadsafe copy of the Triad_T class by passing the important parameters
+! to the myTT constructor
+myTT = Triad_T( no_read = .TRUE., timbre = Triad%gettimbre(), spath = Triad%getsourcepath() )
+
+!$OMP DO SCHEDULE(DYNAMIC)
 do il = 0, ymax-1
   fl = f1 * 10**(yline(il)*fr)
   do iu = 0, xmax-1
     if (il.lt.ymax/2) then 
       if ( ((xline(0)-yline(il)*0.5D0).lt.xline(iu)).and.(xline(iu).lt.(xline(xmax-1)+yline(il)*0.5D0)) ) then 
         fu = fl * 10**((xline(iu)-0.5*(yline(il)))*fr)
-        DD(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'D' )
-        TT(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'T' )
-        MM(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'M' )
+        DD(xmax-1-iu, il) = myTT%totalquantity( f1, fl, fu, 'D' )
+        TT(xmax-1-iu, il) = myTT%totalquantity( f1, fl, fu, 'T' )
+        MM(xmax-1-iu, il) = myTT%totalquantity( f1, fl, fu, 'M' )
       end if
     else
       if ( ((xline(0)+yline(il)*0.5D0).lt.xline(iu)).and.(xline(iu).lt.(xline(xmax-1)-yline(il)*0.5D0)) ) then 
         fu = fl * 10**((xline(iu)-0.5*(yline(il)))*fr)
-        DD(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'D' )
-        TT(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'T' )
-        MM(xmax-1-iu, il) = Triad%totalquantity( f1, fl, fu, 'M' )
+        DD(xmax-1-iu, il) = myTT%totalquantity( f1, fl, fu, 'D' )
+        TT(xmax-1-iu, il) = myTT%totalquantity( f1, fl, fu, 'T' )
+        MM(xmax-1-iu, il) = myTT%totalquantity( f1, fl, fu, 'M' )
       end if 
     end if 
   end do 
+  if (mod(il,50).eq.0) then 
+    io_int = (/ il, ymax /)
+    call Message%WriteValue(' completed ',io_int, 2, frm="(I5,' of ',I5,' lines')")
+  end if
 end do
+!$OMP END DO
+!$OMP END PARALLEL
 
 call Message%printMessage('  --->  Done ')
 call Message%printMessage(' ')
