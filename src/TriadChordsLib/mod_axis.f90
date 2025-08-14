@@ -163,6 +163,7 @@ private
   procedure, pass(self) :: setexponent_
 
   generic, public :: axis => axis_
+  generic, public :: initframe => initframe_
 end type axis_T
 
 ! the constructor routine for this class 
@@ -173,8 +174,7 @@ end interface axis_T
 contains
 
 !--------------------------------------------------------------------------
-! type(axis_T) function axis_constructor( PS, axw, xll, yll ) result(axis)
-type(axis_T) function axis_constructor( axw, xll, yll ) result(axis)
+type(axis_T) function axis_constructor( PS, axw, xll, yll ) result(axis)
 !! author: MDG 
 !! version: 1.0 
 !! date: 02/22/24
@@ -183,15 +183,15 @@ type(axis_T) function axis_constructor( axw, xll, yll ) result(axis)
  
 IMPLICIT NONE
 
-! type(PostScript_T),INTENT(INOUT)  :: PS 
+type(PostScript_T),INTENT(INOUT)  :: PS 
 real(kind=sgl),INTENT(IN)         :: axw
 real(kind=sgl),INTENT(IN)         :: xll
 real(kind=sgl),INTENT(IN)         :: yll
 
 ! pass the PostScript class into the local PS
-! axis%PS = PS
+axis%PS = PS
 
-! set parameters for what used to bet the axistype parameters
+! set parameters for what used to be the axistype parameters
 axis%axw = axw
 axis%xll = xll 
 axis%yll = yll
@@ -209,8 +209,6 @@ subroutine axis_destructor(self)
 IMPLICIT NONE
 
 type(axis_T), INTENT(INOUT)  :: self 
-
-call reportDestructor('axis_T')
 
 end subroutine axis_destructor
 
@@ -660,14 +658,14 @@ real(kind=sgl)                      :: sh,xl,xh,yl,yh,ts,cs,cp,ch,cw,d,low,high,
 character(3)                        :: s,m 
 character(4)                        :: settick
 
- if (m.eq.'log') then
+ if (m.eq.'LOG') then
   mlog = 1
  else
   mlog = 0
  end if
 ! bottom or top
  if ((s.eq.'BOT').or.(s.eq.'TOP')) then
-  if (m.eq.'lin') then
+  if (m.eq.'LIN') then
    settick='xlin'
   else 
    settick='xlog'
@@ -686,7 +684,7 @@ character(4)                        :: settick
  end if
 ! left or right
  if ((s.eq.'LEF').or.(s.eq.'RIG')) then
-  if (m.eq.'lin') then
+  if (m.eq.'LIN') then
    settick='ylin'
   else 
    settick='ylog'
@@ -703,7 +701,7 @@ character(4)                        :: settick
    cs=102+mlog
   end if
  end if
- if ((n.ne.0).and.(m.ne.'log')) call self%setexponent_(n,s)
+ if ((n.ne.0).and.(m.ne.'LOG')) call self%setexponent_(n,s)
 ! go to the new origin
  if ((s.eq.'BOT').or.(s.eq.'TOP')) then  
   q = -xl*140.0/(xh-xl) - 20.0
@@ -754,7 +752,7 @@ character(4)                        :: settick
 end subroutine drawborder_
 
 !  ******************************************************************************
-recursive subroutine drawfigure_(self,xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec)
+recursive subroutine drawfigure_(self,xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec,lthick)
 
 use mod_postscript
  
@@ -762,7 +760,7 @@ IMPLICIT NONE
  
 class(axis_T), INTENT(INOUT)        :: self
 integer(kind=irg)                   :: i,mark,points
-real(kind=sgl)                      :: xdraw,ydraw,xmin,xmax,ymin,ymax,qx,qy,sx,sy,q
+real(kind=sgl)                      :: xdraw,ydraw,xmin,xmax,ymin,ymax,qx,qy,sx,sy,q,lthick
 character(3)                        :: pmode,xmode,ymode
 real(kind=sgl)                      :: xvec(points),yvec(points) 
   
@@ -773,7 +771,7 @@ real(kind=sgl)                      :: xvec(points),yvec(points)
 ! switch the scale to draw figure
  sx = 140.0/(1.4*(xmax-xmin))
  sy = 140.0/(1.4*(ymax-ymin))
- q = 0.001/sy
+ q = lthick  !  0.005/sy
  call self%PS%setlinewidth(q)
  write(self%PS%psunit,"(E14.6,' ',E14.6,' scale')") sx,sy
 ! clip the drawing, so that none of it appears outside of the square
@@ -800,6 +798,9 @@ real(kind=sgl)                      :: xvec(points),yvec(points)
   else
    ydraw=yvec(i)
   end if
+  if (pmode.eq.'CIR') then
+    call self%PS%filledcircle(xdraw,ydraw,0.006,0.2)
+  end if 
   if (pmode.eq.'CON') then
    if (i.eq.1) then
     call self%PS%move(xdraw,ydraw) 
@@ -870,7 +871,7 @@ end subroutine initframe_
 
 !  ******************************************************************************
 recursive subroutine axis_(self,points,xvec,yvec,xmin,xmax,ymin,ymax,xautorange,yautorange, &
-                          xmode,ymode,pmode,mark,scalex,scaley,overplot,db,title,xtitle,ytitle)
+                          xmode,ymode,pmode,lthick,mark,scalex,scaley,overplot,db,title,xtitle,ytitle)
 !DEC$ ATTRIBUTES DLLEXPORT :: axis_
 
 use mod_postscript
@@ -880,7 +881,7 @@ IMPLICIT NONE
 class(axis_T), INTENT(INOUT)   :: self
 integer(kind=irg)              :: points,mark
 integer(kind=irg)              :: nx,ny
-real(kind=sgl)                 :: xvec(points), yvec(points), xmin, xmax, ymin, ymax,q,r
+real(kind=sgl)                 :: xvec(points), yvec(points), xmin, xmax, ymin, ymax,q,r, lthick
 real(kind=sgl)                 :: sxmin,sxmax,symin,symax 
 logical                        :: xautorange, yautorange,overplot,db
 character(3)                   :: xmode, ymode, pmode, scalex, scaley
@@ -918,7 +919,7 @@ character(*)                   :: title,xtitle,ytitle
  ymin=ymin*power(ny)
  ymax=ymax*power(ny)
 ! draw the curve 
- call self%drawfigure_(xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec)
+ call self%drawfigure_(xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec,lthick)
 ! draw the titles (this could also be done from the 
 ! calling program, immediately after the axis call)
 ! write (psunit,*) 'initclip'
@@ -931,10 +932,10 @@ character(*)                   :: title,xtitle,ytitle
  r=-10.0
  call self%PS%text(q,r,xtitle)
 ! rotate the text by 90 degrees
- write (self%PS%psunit,"(f12.6, f12.6,' T 90.0 rotate')") -10.0,50.0-stringl(ytitle)/2.0
+ write (self%PS%psunit,"(f12.6, f12.6,' T 90.0 rotate')") -5.0,50.0-stringl(ytitle)/2.0
  r=0
  call self%PS%text(r,r,ytitle)
- write (self%PS%psunit,"(' -90.0 rotate ',f12.6, f12.6,' T')") 10.0,-50.0+stringl(ytitle)/2.0
+ write (self%PS%psunit,"(' -90.0 rotate ',f12.6, f12.6,' T')") 10.0,-48.0+stringl(ytitle)/2.0
 ! return the proper min and max values
  if (xmode.eq.'log') then 
   xmin=power(nint(xmin))

@@ -169,6 +169,102 @@ A = aug(:, M+1:2*M)
 
 end subroutine invert
 
+!--------------------------------------------------------------------------
+subroutine polyfit(x, y, m, n, yfit)
+!! Fits a polynomial of degree n to m data points (x, y)
+!! using least squares without LAPACK.
+!! 
+!! Arguments:
+!!   x(m)      : input 1D array of double precision X values
+!!   y(m)      : input 1D array of double precision Y values
+!!   m         : number of data points
+!!   n         : degree of the polynomial
+!!   coeff(0:n): output polynomial coefficients, lowest degree first
+
+integer, intent(in)         :: m, n
+real(kind=dbl), intent(in)  :: x(m), y(m)
+real(kind=dbl), intent(out) :: yfit(m)
+
+real(kind=dbl)              :: A(0:n,0:n), b(0:n), coeff(0:n)
+real(kind=dbl)              :: sum_x(0:2*n)
+real(kind=dbl)              :: sum_xy(0:n)
+integer                     :: i, j, k
+real(kind=dbl)              :: factor, pivot
+integer                     :: pivot_row
+real(kind=dbl), parameter   :: eps = 1.0D-12
+
+!---------------------------------------------------------
+! 1. Precompute sums of powers of x and x*y
+!---------------------------------------------------------
+sum_x = 0.D0
+sum_xy = 0.D0
+do i = 1, m
+    do j = 0, 2*n
+        sum_x(j) = sum_x(j) + x(i)**j
+    end do
+    do j = 0, n
+        sum_xy(j) = sum_xy(j) + y(i) * x(i)**j
+    end do
+end do
+
+!---------------------------------------------------------
+! 2. Build the normal equations matrix A and vector b
+!---------------------------------------------------------
+do i = 0, n
+    do j = 0, n
+        A(i,j) = sum_x(i+j)
+    end do
+    b(i) = sum_xy(i)
+end do
+
+!---------------------------------------------------------
+! 3. Solve A * coeff = b using Gaussian elimination
+!    with partial pivoting
+!---------------------------------------------------------
+do k = 0, n
+    ! Find pivot
+    pivot_row = k
+    pivot = abs(A(k,k))
+    do i = k+1, n
+        if (abs(A(i,k)) > pivot) then
+            pivot = abs(A(i,k))
+            pivot_row = i
+        end if
+    end do
+
+    if (pivot < eps) stop "Singular matrix in polyfit"
+
+    ! Swap rows if needed
+    if (pivot_row /= k) then
+        A([k,pivot_row],:) = A([pivot_row,k],:)
+        b([k,pivot_row])   = b([pivot_row,k])
+    end if
+
+    ! Eliminate entries below pivot
+    do i = k+1, n
+        factor = A(i,k) / A(k,k)
+        A(i,k:n) = A(i,k:n) - factor * A(k,k:n)
+        b(i)     = b(i)     - factor * b(k)
+    end do
+end do
+
+! Back substitution
+do i = n, 0, -1
+    coeff(i) = (b(i) - sum(A(i,i+1:n) * coeff(i+1:n))) / A(i,i)
+end do
+
+!---------------------------------------------------------
+! 4. Compute fitted values yfit(i) = sum_j coeff(j)*x(i)**j
+!---------------------------------------------------------
+do i = 1, m
+    yfit(i) = 0.D0
+    do j = 0, n
+        yfit(i) = yfit(i) + coeff(j) * x(i)**j
+    end do
+end do
+
+end subroutine polyfit
+
 
 
 end module mod_math

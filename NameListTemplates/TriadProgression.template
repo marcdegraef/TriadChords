@@ -3,9 +3,19 @@
  triad1 = 0 4 7,
 ! chord 2
  triad2 = 0 3 7, 
-! chord 3
- triad3 = 0 3 7,
-! number of pixels per interval
+! chord 3; if set to 0 0 0, then the program will generate a 2D plot (postscript) of the two-chord progression,
+! with the first chord fixed and the second one sliding from 2 octaves below to 2 octaves above the 
+! fixed chord.  If triad3 is not equal to 0 0 0, then a three-chord progression will be computed, in 
+! which case the output will be in the form of tiff/bmp color maps.
+ triad3 = 0 0 0,
+! output file name (used for debugging purposes only)
+ outname = 'undefined',
+!
+!#######
+!####### parameters for three-chord progression
+!#######
+!
+ ! number of pixels per interval 
  scale = 40,
 ! range of plot along horizontal axis (in units of intervals)
  interval_range = 24,
@@ -13,6 +23,15 @@
  bg = 'w',
 ! perform background subtraction with 3rd order polynomial fit ? ('y', 'n')
  bgsubtract = 'y',
-! output file name
- outname = 'undefined',
+! three-chord dissonance color map (tiff/bmp)
+ dissonance_file = 'undefined',
+! three-chord tension color map (tiff/bmp)
+ tension_file = 'undefined',
+!
+!#######
+!####### parameters for two-chord progression
+!#######
+!
+! two-chord sonority plot (ps)
+ sonority_file = 'undefined',
  /

@@ -133,6 +133,7 @@ character(20),public,parameter :: PSfonts(5) = (/"Symbol              ", &
       procedure, pass(self) :: draw_
       procedure, pass(self) :: line_gray_
       procedure, pass(self) :: setlinewidth_
+      procedure, pass(self) :: setlinecolor_
       procedure, pass(self) :: square_
       procedure, pass(self) :: filledsquare_
       procedure, pass(self) :: cross_
@@ -176,6 +177,7 @@ character(20),public,parameter :: PSfonts(5) = (/"Symbol              ", &
       generic, public :: draw => draw_
       generic, public :: line_gray => line_gray_
       generic, public :: setlinewidth => setlinewidth_
+      generic, public :: setlinecolor => setlinecolor_
       generic, public :: square => square_
       generic, public :: filledsquare => filledsquare_
       generic, public :: cross => cross_
@@ -264,8 +266,6 @@ IMPLICIT NONE
 
 type(PostScript_T), INTENT(INOUT)         :: self
 
-call reportDestructor('PostScript_T')
-
 end subroutine PS_destructor
 
 !--------------------------------------------------------------------------
@@ -297,16 +297,16 @@ character(fnlen)                      :: gname
  self%psscale=1.0
 
 ! open file and dump Prolog and Comments sections
-!  if (present(dontask)) then
-! ! don't ask for a file name
-!    open(unit=self%psunit,file=trim(EMsoft%toNativePath(self%psname)),status='unknown',action='write',form='formatted')
-!    call Message%printMessage('Opening temporary file for PostScript output', frm = "(A)")
-!  else
-! ! do ask for a file name
-!    call Message%ReadValue(' Enter Postscript file name : ', gname,"(A)")
-!    self%psname = trim(gname)
-!    open(unit=self%psunit,file=trim(EMsoft%toNativePath(self%psname)),status='unknown',form='formatted')
-!  end if
+ if (present(dontask)) then
+! don't ask for a file name
+   open(unit=self%psunit,file=trim(self%psname),status='unknown',action='write',form='formatted')
+   call Message%printMessage('Opening temporary file for PostScript output', frm = "(A)")
+ else
+! do ask for a file name
+   call Message%ReadValue(' Enter Postscript file name : ', gname,"(A)")
+   self%psname = trim(gname)
+   open(unit=self%psunit,file=trim(self%psname),status='unknown',form='formatted')
+ end if
 
 ! write the preamble
  write (self%psunit,"(A)") PSpreamble(1)
@@ -594,6 +594,24 @@ real(kind=sgl),INTENT(IN)            :: x
  write (self%psunit,"(F12.7,' setlinewidth')") x
 
 end subroutine setlinewidth_
+
+!--------------------------------------------------------------------------
+recursive subroutine setlinecolor_(self,rgb)
+!DEC$ ATTRIBUTES DLLEXPORT :: setlinecolor_
+  !! author: MDG
+  !! version: 1.0
+  !! date: 08/14/25
+  !!
+  !!  set the line color (rgb) 
+
+IMPLICIT NONE
+
+class(PostScript_T),INTENT(INOUT)    :: self
+real(kind=sgl),INTENT(IN)            :: rgb(3)
+
+ write (self%psunit,"(3(F12.7,' '),' setrgbcolor')") rgb
+
+end subroutine setlinecolor_
 
 !--------------------------------------------------------------------------
 recursive subroutine square_(self,x,y,edge)

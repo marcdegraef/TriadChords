@@ -40,7 +40,7 @@ add_library(TriadLib ${LIB_TYPE} ${TriadLib_SRCS})
 
 if (Fortran_COMPILER_NAME MATCHES "gfortran.*")
   target_link_libraries(TriadLib
-                  gomp
+#                  gomp
   )
 endif()
 

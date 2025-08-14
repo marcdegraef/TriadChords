@@ -39,6 +39,7 @@ type, public :: Triad_T
     type(timbre_descriptor)     :: timbre_parameters
     type(triad_colors)          :: clrs
     type(triad_chords)          :: TC
+    type(scale),public          :: chromatic
 
 ! then a few allocatable arrays
     real(kind=dbl),allocatable  :: timbre(:)        ! timbre amplitudes
