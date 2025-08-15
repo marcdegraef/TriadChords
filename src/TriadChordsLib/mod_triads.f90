@@ -52,6 +52,7 @@ contains
   private
 
     procedure, pass(self) :: triad_
+    procedure, pass(self) :: triad_reset_
     procedure, pass(self) :: triad_dissonance_
     procedure, pass(self) :: triad_tension_
     procedure, pass(self) :: triad_modality_
@@ -76,6 +77,7 @@ contains
     procedure, pass(self) :: saveColorMap_
 
     generic, public :: triad => triad_
+    generic, public :: triad_reset => triad_reset_
     generic, public :: triad_dissonance => triad_dissonance_
     generic, public :: triad_tension => triad_tension_
     generic, public :: triad_modality => triad_modality_
@@ -108,7 +110,7 @@ end interface Triad_T
 contains
 
 !--------------------------------------------------------------------------
-type(Triad_T) function Triad_constructor( no_alloc, no_read, timbre, spath ) result(Triad)
+type(Triad_T) function Triad_constructor( no_alloc, no_read, timbre, spath, nump ) result(Triad)
 !DEC$ ATTRIBUTES DLLEXPORT :: Triad_constructor
   !! author: MDG
   !! date: 10/22/08
@@ -119,20 +121,21 @@ use mod_io
 
 IMPLICIT NONE
 
-logical,INTENT(IN),OPTIONAL       :: no_alloc
-logical,INTENT(IN),OPTIONAL       :: no_read
+logical,INTENT(IN),OPTIONAL                 :: no_alloc
+logical,INTENT(IN),OPTIONAL                 :: no_read
 type(timbre_descriptor),INTENT(IN),OPTIONAL :: timbre
 character(fnlen),INTENT(IN),OPTIONAL        :: spath
+integer(kind=irg),INTENT(IN),OPTIONAL       :: nump
 
-type(IO_T)                        :: Message 
+type(IO_T)                                  :: Message 
 
-integer(kind=irg)                 :: i,j,k,i1,i2,istat         ! loop parameters
-character(fnlen)                  :: ConfigFile = 'TriadConfig.txt'
-logical                           :: fexists, alloc
+integer(kind=irg)                           :: i,j,k,i1,i2,istat         ! loop parameters
+character(fnlen)                            :: ConfigFile = 'TriadConfig.txt'
+logical                                     :: fexists, alloc
 
-integer(kind=irg)                 :: num_partials, timbre_type
-real(kind=dbl)                    :: base, f1 
-character(fnlen)                  :: sourcepath
+integer(kind=irg)                           :: num_partials, timbre_type
+real(kind=dbl)                              :: base, f1 
+character(fnlen)                            :: sourcepath
 
 namelist /TriadConfig/ num_partials, timbre_type, base, f1, sourcepath 
 
@@ -193,6 +196,10 @@ if (present(no_alloc)) then
 end if 
 
 if (alloc.eqv..TRUE.) then
+  if (present(nump)) then    ! we override the value of the num_partials parameter if necessary
+    Tt%num_partials = nump
+  end if  
+
 ! allocate the timbre variable with one extra slot for the root frequency
   if (.not.allocated(Triad%timbre)) then 
     allocate(Triad%timbre(0:Tt%num_partials),stat=istat)
@@ -271,6 +278,28 @@ end if
 end associate 
 
 end function Triad_constructor
+
+!--------------------------------------------------------------------------
+subroutine triad_reset_(self)
+!DEC$ ATTRIBUTES DLLEXPORT :: triad_reset_
+!! author: MDG
+!! version: 1.0
+!! date: 08/04/25
+!!
+!! deallocate all arrays in the Triad_T class
+
+IMPLICIT NONE
+
+class(Triad_T), INTENT(INOUT)    :: self
+
+if (allocated(self%timbre)) deallocate(self%timbre)
+if (allocated(self%partials)) deallocate(self%partials)
+if (allocated(self%prods2)) deallocate(self%prods2)
+if (allocated(self%prods)) deallocate(self%prods)
+if (allocated(self%q2)) deallocate(self%q2)
+if (allocated(self%q3)) deallocate(self%q3)
+
+end subroutine triad_reset_
 
 !--------------------------------------------------------------------------
 subroutine setbase_(self,inp)

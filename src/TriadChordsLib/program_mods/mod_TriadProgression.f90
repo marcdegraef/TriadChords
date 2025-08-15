@@ -63,6 +63,7 @@ private
   procedure, pass(self) :: readNameList_
   procedure, pass(self) :: getNameList_
   procedure, pass(self) :: TriadProgression_
+  procedure, pass(self) :: computeTwoChords_
 
   generic, public :: getNameList => getNameList_
   generic, public :: readNameList => readNameList_
@@ -261,16 +262,17 @@ type(axis_T)                                    :: AX
 type(IO_T)                                      :: Message
 
 integer(kind=sgl)                               :: i,j,k,l,iv11,iv12,iv21,iv22,iv31,iv32,dimx,dimy,numx,numy,istat, &
-                                                   TID, io_int(2), imanum, mark, interval_range
+                                                   TID, io_int(2), imanum, mark, interval_range, ip, np, orig_partials
 real(kind=dbl)                                  :: set1(3), set2(3), set3(3), fr2(3), fr3(3), tt12, p1, p2
 real(kind=dbl)                                  :: tt13, tt23, dd12, dd13, dd23, mm12, mm13, mm23, f1, fr, frat
 real(kind=sgl)                                  :: xmi, xma, ymi, yma, axw, xll, yll, qx, qy, dx, fw, fh, sx, sy, q, &
-                                                   dy(12), lthick
+                                                   dy(12), lthick, lrgb(3), mvalson
 real(kind=dbl),allocatable                      :: xx(:),dd(:,:),ttt(:,:), mm(:,:), ran(:), Grid(:,:), Grid2(:,:), &
                                                    background(:,:), backgr(:), dd2(:), tt2(:), son(:) 
 real(kind=sgl),allocatable                      :: xvec(:), yvec(:)
 character(len=7)                                :: id
 character(2)                                    :: lett
+character(7)                                    :: lett7
 logical                                         :: xautorange, yautorange, overplot, drawborder
 character(3)                                    :: xmode, ymode, pmode, scalex, scaley
 character(fnlen)                                :: title, xtitle, ytitle
@@ -473,72 +475,25 @@ if (self%TwoOrThree.eq.3) then
   close(unit=dataunit,status='keep')
 
 else  ! we're doing a two-chord progression
-! instantiate the Triad class
+! instantiate the Triad class for the maximum number of upper partials
   TT = Triad_T()
-  f1 = TT%getf1()
-  fr = 1.D0/TT%fits%freq2int
   interval_range = 48 
-
-! define the simulation parameters and allocate arrays
   dimx = interval_range * nml%scale 
-  allocate(dd2(dimx),tt2(dimx),son(dimx),xvec(dimx),yvec(dimx),backgr(dimx),stat=istat)
+  p1 = interval_range/2
+  orig_partials = TT%getnum_partials()
 
-  set1 = dble(nml%triad1) ! this is the fixed triad
-  set2 = dble(nml%triad2) ! and this is the moving one
-
-  write(*,*) nml%triad1,': ', set1 
-  write(*,*) nml%triad2,': ', set2 
-
-  p1 = dble(nml%interval_range/2)
-
+  allocate(xvec(dimx),yvec(dimx), stat=istat)
   do j=1,dimx
-        xvec(j) = real(p1 * dble(2*j - (dimx+1))/dble(dimx))
-        fr2 =  p1 * dble(2*j - (dimx+1))/dble(dimx) + set2 
-        tt12 =        TT%triad_tension(fr2(1),set1(1),set1(2))
-        tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(3))
-        tt12 = tt12 + TT%triad_tension(fr2(1),set1(2),set1(3))
-        tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(2))
-        tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(3))
-        tt12 = tt12 + TT%triad_tension(fr2(2),set1(2),set1(3))
-        tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(2))
-        tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(3))
-        tt12 = tt12 + TT%triad_tension(fr2(3),set1(2),set1(3))
-        
-        tt12 = tt12 + TT%triad_tension(set1(1),fr2(1),fr2(2))
-        tt12 = tt12 + TT%triad_tension(set1(1),fr2(1),fr2(3))
-        tt12 = tt12 + TT%triad_tension(set1(1),fr2(2),fr2(3))
-        tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(2))
-        tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(3))
-        tt12 = tt12 + TT%triad_tension(set1(2),fr2(2),fr2(3))
-        tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(2))
-        tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(3))
-        tt12 = tt12 + TT%triad_tension(set1(3),fr2(2),fr2(3))
-        tt12 = tt12/18.D0
-
-        dd12 = 0.D0
-        do k=1,3
-                do l=1,3
-                        dd12 = dd12 + TT%triad_dissonance(dabs(fr2(k)-set1(l)))
-                end do
-        end do
-        dd12 = dd12/9.D0
-
-        dd2(j) = dd12
-        tt2(j) = tt12
+    xvec(j) = real(p1 * dble(2*j - (dimx+1))/dble(dimx))
   end do 
-  
-! compute the sonority
-  son = dd2 + TT%fits%delta * tt2  ! this is the instability
-  call polyfit(dble(xvec), son, dimx, 3, backgr)
-  son = son - backgr
-  son = son - minval(son)
-  son = son/maxval(son)
-  son = 1.D0 - son
+
+! compute the sonority curve for the max number of partials
+  call self%computeTwoChords_(TT, dimx, yvec)
 
 ! the output for this mode is in postscript format so we need to open a file
 ! and then call the axis routine to plot the sonority curve
   imanum = 1
-  PS = PostScript_T(progdesc, imanum, dontask=.TRUE., psname = trim(nml%sonority_file) )
+  PS = PostScript_T(progdesc, imanum, dontask=.TRUE., psname = nml%sonority_file )
   call PS%setlinewidth(0.25)
   
 ! initialize the axis class
@@ -546,17 +501,18 @@ else  ! we're doing a two-chord progression
   yll = 2.25
   axw = 6.5
   AX = Axis_T( PS, axw = axw, xll = xll, yll = yll )
-  yvec = real(son)
+  ! yvec = real(son)
   xmi = real(minval(xvec))
   xma = real(maxval(xvec))
-  ymi = real(minval(son))
-  yma = real(maxval(son))
+  ymi = real(minval(yvec))
+  yma = real(maxval(yvec))
   xautorange = .TRUE.
-  yautorange = .TRUE.
+  yautorange = .FALSE.
   xmode = 'LIN'
   ymode = 'LIN'
-  pmode = 'BAR'
-  lthick = 0.0075
+  pmode = 'CON'
+  lthick = 0.005
+  lrgb = (/ 0.0, 0.0, 0.0 /)
   mark = 1
   scalex = 'NON'
   scaley = 'NON'
@@ -573,8 +529,43 @@ else  ! we're doing a two-chord progression
   xtitle = 'Second chord location'
   ytitle = 'Sonority (arbitrary units)'
 
-  call AX%axis(dimx,xvec,yvec,xmi,xma,ymi,yma,xautorange,yautorange,xmode,ymode,pmode,lthick, &
+  call AX%axis(dimx,xvec,yvec,xmi,xma,ymi,yma,xautorange,yautorange,xmode,ymode,pmode,lthick,lrgb, &
                mark,scalex,scaley,overplot,drawborder,title,xtitle,ytitle)
+
+  pmode = 'BAR'
+  overplot = .TRUE.
+  drawborder = .FALSE.
+  lrgb = (/ 1.0, 0.0, 0.0 /)
+
+  call AX%axis(dimx,xvec,yvec*0.995,xmi,xma,ymi,yma,xautorange,yautorange,xmode,ymode,pmode,lthick,lrgb, &
+               mark,scalex,scaley,overplot,drawborder,title,xtitle,ytitle)
+
+! next we rerun the computations with one less partial each time until we reach a single partial
+  np = TT%getnum_partials()
+
+! for the plot, we use the overplot mode and change the color from red to yellow
+
+  do ip = np-1, 1, -1
+    call TT%triad_reset()
+    io_int(1) = ip 
+    call Message%WriteValue(' resetting to # partials : ', io_int, 1)
+    TT = Triad_T( nump = ip )
+    call self%computeTwoChords_(TT, dimx, yvec)
+
+    yvec = yvec * real(ip)/real(np)
+    pmode = 'CON'
+    overplot = .TRUE.
+    drawborder = .FALSE.
+    xautorange = .FALSE.
+    yautorange = .FALSE.
+    lrgb = (/ 0.0, 0.0, 0.0 /)
+    call AX%axis(dimx,xvec,yvec,xmi,xma,ymi,yma,xautorange,yautorange,xmode,ymode,pmode,lthick,lrgb, &
+                 mark,scalex,scaley,overplot,drawborder,title,xtitle,ytitle)
+    pmode = 'BAR'
+    lrgb = (/ 1.0, real(np-ip)/real(np-1), 0.0 /)
+    call AX%axis(dimx,xvec,yvec,xmi,xma,ymi,yma,xautorange,yautorange,xmode,ymode,pmode,lthick,lrgb, &
+                 mark,scalex,scaley,overplot,drawborder,title,xtitle,ytitle)
+  end do
 
 ! determine lower left corner of plot
   call AX%initframe('start',db=.FALSE.)
@@ -587,7 +578,6 @@ else  ! we're doing a two-chord progression
   qx = -xmi*100.0/(xma-xmi)
   qy = -ymi*100.0/(yma-ymi)
   dx = 0.98 * 100.0/real(nml%interval_range+1)
-  write (*,*) ' line step size = ', dx, qx, qy
 
 ! vertical lines
   do i = nml%interval_range/2+1,-nml%interval_range/2+1,-1 ! 1,nml%interval_range+1
@@ -618,6 +608,21 @@ else  ! we're doing a two-chord progression
     call PS%stroke()
   end do 
 
+! finally, a couple of pieces of information about this program run...
+  call PS%setlinecolor( (/ 0.0, 0.0, 0.0 /) )
+  call PS%setfont( PSfonts(3), 4.0)
+  write (lett,"(I2)") orig_partials
+  call PS%text( -50.0, -5.0, '# upper partials '//lett)  
+  write (lett7,"(F7.3)") TT%getf1()
+  call PS%text( -50.0, -10.0, 'Fundamental (Hz) '//lett7)  
+  if (TT%gettimbre_type().eq.1) then 
+    write (lett7,"(F7.3)") TT%getbase()
+    call PS%text( -50.0, -15.0, 'Timbre : base^n ')  
+    call PS%text( -50.0, -20.0, '   Base : '//lett7)  
+  else
+    call PS%text( -50.0, -15.0, 'Timbre : 1/n ')  
+  end if 
+
 ! close Postscript file
   call PS%closefile()
 
@@ -626,5 +631,86 @@ end if
 end associate 
 
 end subroutine TriadProgression_
+
+!--------------------------------------------------------------------------
+subroutine computeTwoChords_(self, TT, dimx, yvec)
+!DEC$ ATTRIBUTES DLLEXPORT :: computeTwoChords_
+!! author: MDG 
+!! version: 1.0 
+!! date: 08/15/25
+!!
+!! perform the computations for a two-chord progression
+
+use mod_io 
+use mod_triads
+use mod_math
+
+IMPLICIT NONE 
+
+class(TriadProgression_T), INTENT(INOUT)        :: self
+type(Triad_T),INTENT(INOUT)                     :: TT
+integer(kind=irg),INTENT(IN)                    :: dimx
+real(kind=sgl),INTENT(INOUT)                    :: yvec(dimx)
+
+real(kind=dbl)                                  :: f1, fr, set1(3), set2(3), tt12, dd12, fr2(3)
+real(kind=dbl)                                  :: dd2(dimx), tt2(dimx), son(dimx), backgr(dimx), xvec(dimx)
+integer(kind=irg)                               :: p1, j, k, l 
+
+f1 = TT%getf1()
+fr = 1.D0/TT%fits%freq2int
+
+set1 = dble(self%nml%triad1) ! this is the fixed triad
+set2 = dble(self%nml%triad2) ! and this is the moving one
+
+p1 = 24
+dd2 = 0.0 
+tt2 = 0.0 
+
+do j=1,dimx
+      xvec(j) = p1 * dble(2*j - (dimx+1))/dble(dimx)
+      fr2 =  xvec(j) + set2 
+      tt12 =        TT%triad_tension(fr2(1),set1(1),set1(2))
+      tt12 = tt12 + TT%triad_tension(fr2(1),set1(1),set1(3))
+      tt12 = tt12 + TT%triad_tension(fr2(1),set1(2),set1(3))
+      tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(2))
+      tt12 = tt12 + TT%triad_tension(fr2(2),set1(1),set1(3))
+      tt12 = tt12 + TT%triad_tension(fr2(2),set1(2),set1(3))
+      tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(2))
+      tt12 = tt12 + TT%triad_tension(fr2(3),set1(1),set1(3))
+      tt12 = tt12 + TT%triad_tension(fr2(3),set1(2),set1(3))
+      
+      tt12 = tt12 + TT%triad_tension(set1(1),fr2(1),fr2(2))
+      tt12 = tt12 + TT%triad_tension(set1(1),fr2(1),fr2(3))
+      tt12 = tt12 + TT%triad_tension(set1(1),fr2(2),fr2(3))
+      tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(2))
+      tt12 = tt12 + TT%triad_tension(set1(2),fr2(1),fr2(3))
+      tt12 = tt12 + TT%triad_tension(set1(2),fr2(2),fr2(3))
+      tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(2))
+      tt12 = tt12 + TT%triad_tension(set1(3),fr2(1),fr2(3))
+      tt12 = tt12 + TT%triad_tension(set1(3),fr2(2),fr2(3))
+      tt12 = tt12/18.D0
+
+      dd12 = 0.D0
+      do k=1,3
+              do l=1,3
+                      dd12 = dd12 + TT%triad_dissonance(dabs(fr2(k)-set1(l)))
+              end do
+      end do
+      dd12 = dd12/9.D0
+
+      dd2(j) = dd12
+      tt2(j) = tt12
+end do 
+
+! compute the sonority
+son = dd2 + TT%fits%delta * tt2  ! this is the instability
+call polyfit(xvec, son, dimx, 3, backgr)
+son = son - backgr
+son = son - minval(son)
+son = son/maxval(son)
+write (*,*) ' range(son) : ', minval(son), maxval(son)
+yvec = real(1.D0 - son)
+
+end subroutine computeTwoChords_
 
 end module mod_TriadProgression

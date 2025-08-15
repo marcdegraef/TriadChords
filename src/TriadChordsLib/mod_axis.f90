@@ -752,7 +752,7 @@ character(4)                        :: settick
 end subroutine drawborder_
 
 !  ******************************************************************************
-recursive subroutine drawfigure_(self,xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec,lthick)
+recursive subroutine drawfigure_(self,xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec,lthick,lrgb)
 
 use mod_postscript
  
@@ -762,7 +762,7 @@ class(axis_T), INTENT(INOUT)        :: self
 integer(kind=irg)                   :: i,mark,points
 real(kind=sgl)                      :: xdraw,ydraw,xmin,xmax,ymin,ymax,qx,qy,sx,sy,q,lthick
 character(3)                        :: pmode,xmode,ymode
-real(kind=sgl)                      :: xvec(points),yvec(points) 
+real(kind=sgl)                      :: xvec(points),yvec(points),lrgb(3) 
   
 ! go to the new origin
  qx = -xmin*100.0/(xmax-xmin)
@@ -773,6 +773,7 @@ real(kind=sgl)                      :: xvec(points),yvec(points)
  sy = 140.0/(1.4*(ymax-ymin))
  q = lthick  !  0.005/sy
  call self%PS%setlinewidth(q)
+ call self%PS%setlinecolor(lrgb)
  write(self%PS%psunit,"(E14.6,' ',E14.6,' scale')") sx,sy
 ! clip the drawing, so that none of it appears outside of the square
 ! write (psunit,*) '1.0 setgray'
@@ -823,6 +824,7 @@ real(kind=sgl)                      :: xvec(points),yvec(points)
 ! set the scale back to what is was !!!
  write (self%PS%psunit,"(E14.6,' ',E14.6,' scale')") 1.0/sx,1.0/sy
  call self%PS%translate(-qx,-qy)
+ call self%PS%setlinecolor((/ 0.0, 0.0, 0.0 /))
 
 end subroutine drawfigure_
 
@@ -871,7 +873,7 @@ end subroutine initframe_
 
 !  ******************************************************************************
 recursive subroutine axis_(self,points,xvec,yvec,xmin,xmax,ymin,ymax,xautorange,yautorange, &
-                          xmode,ymode,pmode,lthick,mark,scalex,scaley,overplot,db,title,xtitle,ytitle)
+                          xmode,ymode,pmode,lthick,lrgb,mark,scalex,scaley,overplot,db,title,xtitle,ytitle)
 !DEC$ ATTRIBUTES DLLEXPORT :: axis_
 
 use mod_postscript
@@ -882,7 +884,7 @@ class(axis_T), INTENT(INOUT)   :: self
 integer(kind=irg)              :: points,mark
 integer(kind=irg)              :: nx,ny
 real(kind=sgl)                 :: xvec(points), yvec(points), xmin, xmax, ymin, ymax,q,r, lthick
-real(kind=sgl)                 :: sxmin,sxmax,symin,symax 
+real(kind=sgl)                 :: sxmin,sxmax,symin,symax, lrgb(3) 
 logical                        :: xautorange, yautorange,overplot,db
 character(3)                   :: xmode, ymode, pmode, scalex, scaley
 character(*)                   :: title,xtitle,ytitle
@@ -919,7 +921,7 @@ character(*)                   :: title,xtitle,ytitle
  ymin=ymin*power(ny)
  ymax=ymax*power(ny)
 ! draw the curve 
- call self%drawfigure_(xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec,lthick)
+ call self%drawfigure_(xmin,xmax,ymin,ymax,pmode,mark,points,xmode,ymode,xvec,yvec,lthick,lrgb)
 ! draw the titles (this could also be done from the 
 ! calling program, immediately after the axis call)
 ! write (psunit,*) 'initclip'
