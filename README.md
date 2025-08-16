@@ -16,28 +16,9 @@ make -j
 ```
 This will produce (among other things) a TriadsBuild/Bin folder containing all executables.  Use the normal additions to the \$PATH environment variable to provide easy access to the executables from any location on the file system.
 
-This package has not yet been built and tested on Windows (as of August 8, 2025); anyone who'd like to do so is encouraged to add instructions to this README.md file via a pull request.
+This package has not yet been built and tested on Windows (as of August 15, 2025); anyone who'd like to do so is encouraged to add instructions to this README.md file via a pull request.
 
-# Initial Configuration
-All the executables in this packages use a handfuil of configuration parameters that are listed in a **TriadsConfig.txt** text file located in the folder inside which the programas are executed (good practice tip: this should not be inside the folder in which the package was built). To create this file, simply execute one of the programs with the -t command line option; if the configuration file does not exists, the program will create it with the following default content (formatted as a fortran name list file):
-
-```fortran
- &TriadConfig
-! number of upper partials to include
- num_partials = 6,
-! timbre type (1=b^n; 2=1/n)
- timbre_type = 1,
-! base factor for timbre type 1
- base = 0.88D0,
-! fundamental frequency (Hz)
- f1 = 440.0D0,
-! full path to TriadChords source folder
- sourcepath = 'undefined',
- /                    
-```
-Set *num_partials* to the number of upper partials (harmonics) to be considered in all simulations.  Currently there are two timbre types available, an exponential type (*timbre_type*=1) of the form $base^n$ where $n$ is the number of the upper partial and *base* is a number between 0 and 1; the default of 0.88 can be thought of as representing a simple guitar string frequency spectrum.  A second timbre type (2) uses a *1/n* sequence of spectral amplitudes for the upper partials.  *f1* initializes the fundamental frequency used by several of the programs. Finally, the *sourcepath* parameter should be set to the full path of the source code folder installed with the git clone command.  This is needed so that the proper name list template files will be found by the various executables.
-
-Once the **TriadsConfig.txt** file has been created (and edited as needed), most programs should first be executed with the -t option to generate a copy of the name list template file. This file should be renamed with the .nml extension and edited as needed.  Then the program can be executed without the -t option; if the name list file has the default file name, then it does not need to be passed to the program as a command line parameter.  If the file name is not the default name, then the actual file name must be passed to the program.
+Check the wiki pages for this package for information on how to configure things using the **TriadConfig.txt** file.
 
 # License
 BSD 3-Clause License
